@@ -10,6 +10,6 @@ To run the GUI, go to the directory then type:
 GUIcandid 
 ```
 
-The GUI will open.
+The GUI will open. Tool tips are available with some explanations of each function.
 
 ![GUI](figure1.png)

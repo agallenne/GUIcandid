@@ -12,4 +12,4 @@ GUIcandid
 
 The GUI will open.
 
-![GUI](/Users/agallenn/Desktop/Capture d’écran 2020-07-29 à 17.20.46.png)
+![GUI](/images/figure1.png)

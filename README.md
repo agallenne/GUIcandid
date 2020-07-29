@@ -12,4 +12,4 @@ GUIcandid
 
 The GUI will open.
 
-![GUI](/images/figure1.png)
+![GUI](figure1.png)

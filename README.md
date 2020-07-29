@@ -4,3 +4,12 @@ This is a PyQT5 Graphical user interface for the CANDID algorithm to find faint 
 
 CANDID code/install/examples can be find in the original repository [here](https://github.com/amerand/CANDID). CANDID has to be installed as described in the repository.
 
+To run the GUI, go to the directory then type:
+
+```
+GUIcandid 
+```
+
+The GUI will open.
+
+![GUI](/Users/agallenn/Desktop/Capture d’écran 2020-07-29 à 17.20.46.png)

@@ -1,0 +1,940 @@
+#!/usr/bin/env python
+
+# -*- coding: utf-8 -*-
+
+# Form implementation generated from reading ui file 'untitled.ui'
+#
+# Created by: PyQt5 UI code generator 5.9.2
+#
+# WARNING! All changes made in this file will be lost!
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+import multiprocessing
+import candid
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+class Ui_MainWindow(object):
+    def setupUi(self, MainWindow):
+        MainWindow.setObjectName("MainWindow")
+        MainWindow.resize(765, 448)
+
+        self.centralwidget = QtWidgets.QWidget(MainWindow)
+        self.centralwidget.setObjectName("centralwidget")
+        self.label_Setup = QtWidgets.QLabel(self.centralwidget)
+        self.label_Setup.setGeometry(QtCore.QRect(5, 5, 376, 171))
+        
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setUnderline(False)
+        font.setWeight(75)
+        
+        #####################
+        ####### SETUP #######
+        #####################
+        
+        self.label_Setup.setFont(font)
+        self.label_Setup.setAccessibleName("")
+        self.label_Setup.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.label_Setup.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+        self.label_Setup.setObjectName("label_Setup")
+        
+        self.pushButton_LoadOI = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_LoadOI.setGeometry(QtCore.QRect(15, 30, 125, 34))
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.pushButton_LoadOI.sizePolicy().hasHeightForWidth())
+        self.pushButton_LoadOI.setSizePolicy(sizePolicy)
+        font = QtGui.QFont()
+        font.setPointSize(13)
+        self.pushButton_LoadOI.setFont(font)
+        self.pushButton_LoadOI.setLayoutDirection(QtCore.Qt.LeftToRight)
+        self.pushButton_LoadOI.setIconSize(QtCore.QSize(16, 16))
+        self.pushButton_LoadOI.setObjectName("pushButton_LoadOI")
+        self.pushButton_LoadOI.clicked.connect(self.openOI)
+        self.pushButton_LoadOI.setToolTip('Select oifit file(s) to load\n\nLoaded file(s): 0')
+
+        self.pushButton_ClosePlots = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_ClosePlots.setGeometry(QtCore.QRect(132, 30, 125, 34))
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.pushButton_ClosePlots.sizePolicy().hasHeightForWidth())
+        self.pushButton_ClosePlots.setSizePolicy(sizePolicy)
+        font = QtGui.QFont()
+        font.setPointSize(13)
+        self.pushButton_ClosePlots.setFont(font)
+        self.pushButton_ClosePlots.setLayoutDirection(QtCore.Qt.LeftToRight)
+        self.pushButton_ClosePlots.setIconSize(QtCore.QSize(16, 16))
+        self.pushButton_ClosePlots.setObjectName("pushButton_ClosePlots")
+        self.pushButton_ClosePlots.setToolTip('Close all plots')
+        self.pushButton_ClosePlots.clicked.connect(self.closeAllPlots)
+
+        self.pushButton_Quit = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_Quit.setGeometry(QtCore.QRect(248, 30, 125, 34))
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.pushButton_Quit.sizePolicy().hasHeightForWidth())
+        self.pushButton_Quit.setSizePolicy(sizePolicy)
+        font = QtGui.QFont()
+        font.setPointSize(13)
+        self.pushButton_Quit.setFont(font)
+        self.pushButton_Quit.setLayoutDirection(QtCore.Qt.LeftToRight)
+        self.pushButton_Quit.setIconSize(QtCore.QSize(16, 16))
+        self.pushButton_Quit.setObjectName("pushButton_Quit")
+        self.pushButton_Quit.setToolTip('Quit CANDID GUI')
+        self.pushButton_Quit.clicked.connect(app.instance().quit)
+
+        self.label_ColorMap = QtWidgets.QLabel(self.centralwidget)
+        self.label_ColorMap.setGeometry(QtCore.QRect(24, 73, 66, 16))
+        self.label_ColorMap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_ColorMap.setObjectName("label_ColorMap")
+        self.comboBox_ColorMap = QtWidgets.QComboBox(self.centralwidget)
+        self.comboBox_ColorMap.setGeometry(QtCore.QRect(94, 68, 145, 26))
+        self.comboBox_ColorMap.setObjectName("comboBox_ColorMap")
+        self.comboBox_ColorMap.addItems(['cubehelix', 'gist_earth', 'gist_stern','binary', 'CMRmap',
+                    'Reds', 'Spectral', 'afmhot', 'cool', 'gnuplot'])
+        self.comboBox_ColorMap.currentIndexChanged.connect(self.selectColorMap)
+        self.comboBox_ColorMap.setToolTip('Select color map for the maps')
+
+        self.checkBox_Title = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_Title.setEnabled(True)
+        self.checkBox_Title.setGeometry(QtCore.QRect(262, 71, 59, 20))
+        self.checkBox_Title.setAccessibleName("")
+        self.checkBox_Title.setObjectName("checkBox_Title")
+        self.checkBox_Title.stateChanged.connect(self.selectSuptitle)
+        self.checkBox_Title.setChecked(True)
+        self.checkBox_Title.setToolTip('Check if you want suptitle to be written on the plots')
+
+        self.label_Ncores = QtWidgets.QLabel(self.centralwidget)
+        self.label_Ncores.setGeometry(QtCore.QRect(24, 109, 53, 16))
+        self.label_Ncores.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_Ncores.setObjectName("label_Ncores")
+        self.lineEdit_Ncores = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Ncores.setGeometry(QtCore.QRect(80, 106, 45, 23))
+        self.lineEdit_Ncores.setObjectName("lineEdit_Ncores")
+        Ncores = str(max(multiprocessing.cpu_count(),1)-1)
+        self.lineEdit_Ncores.setText(Ncores)
+        self.lineEdit_Ncores.returnPressed.connect(self.changeNcores)
+        self.lineEdit_Ncores.setToolTip('Select the number of cores for multiprocessing (default: N -1)')
+
+        self.label_ExecTime = QtWidgets.QLabel(self.centralwidget)
+        self.label_ExecTime.setGeometry(QtCore.QRect(160, 109, 87, 16))
+        self.label_ExecTime.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_ExecTime.setObjectName("label_ExecTime")
+        self.lineEdit_ExecTime = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_ExecTime.setGeometry(QtCore.QRect(249, 106, 45, 23))
+        self.lineEdit_ExecTime.setObjectName("lineEdit_ExecTime")
+        self.lineEdit_ExecTime.setText('300')
+        self.lineEdit_ExecTime.returnPressed.connect(self.changeExecTime)
+        self.lineEdit_ExecTime.setToolTip('Select the execution time, for large grid it may take longer')
+
+        self.label_Instrument = QtWidgets.QLabel(self.centralwidget)
+        self.label_Instrument.setGeometry(QtCore.QRect(24, 145, 70, 16))
+        self.label_Instrument.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_Instrument.setObjectName("label_Instrument")
+        self.comboBox_Instrument = QtWidgets.QComboBox(self.centralwidget)
+        self.comboBox_Instrument.setGeometry(QtCore.QRect(94, 142, 145, 26))
+        self.comboBox_Instrument.setObjectName("comboBox_Instrument")
+        self.comboBox_Instrument.addItem('All')
+        self.comboBox_Instrument.currentIndexChanged.connect(self.selectInstrument)
+        self.comboBox_Instrument.setToolTip('Select the instrument (if several) to be used to search for a companion')
+
+        ######################
+        ##### PARAMETERS #####
+        ######################
+        
+        self.label_Parameters = QtWidgets.QLabel(self.centralwidget)
+        self.label_Parameters.setGeometry(QtCore.QRect(5, 178, 376, 141))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setUnderline(False)
+        font.setWeight(75)
+        self.label_Parameters.setFont(font)
+        self.label_Parameters.setAccessibleName("")
+        self.label_Parameters.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.label_Parameters.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+        self.label_Parameters.setObjectName("label_Parameters")
+        
+        self.checkBox_CP = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_CP.setEnabled(True)
+        self.checkBox_CP.setGeometry(QtCore.QRect(18, 213, 43, 20))
+        self.checkBox_CP.setAccessibleName("")
+        self.checkBox_CP.setObjectName("checkBox_CP")
+        self.checkBox_CP.setChecked(True)
+        self.checkBox_CP.stateChanged.connect(self.selectObservables)
+        self.checkBox_CP.setToolTip('Check to include CPs in the fit map')
+
+        self.checkBox_V2 = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_V2.setEnabled(True)
+        self.checkBox_V2.setGeometry(QtCore.QRect(78, 213, 42, 20))
+        self.checkBox_V2.setAccessibleName("")
+        self.checkBox_V2.setObjectName("checkBox_V2")
+        self.checkBox_V2.setChecked(True)
+        self.checkBox_V2.stateChanged.connect(self.selectObservables)
+        self.checkBox_V2.setToolTip('Check to include V2s in the fit')
+
+        self.checkBox_T3amp = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_T3amp.setEnabled(True)
+        self.checkBox_T3amp.setGeometry(QtCore.QRect(138, 213, 68, 20))
+        self.checkBox_T3amp.setAccessibleName("")
+        self.checkBox_T3amp.setObjectName("checkBox_T3amp")
+        self.checkBox_T3amp.setChecked(True)
+        self.checkBox_T3amp.stateChanged.connect(self.selectObservables)
+        self.checkBox_T3amp.setToolTip('Check to include T3amps in the fit')
+
+        self.doNotFit = {}
+        self.addParam = {}
+        self.alpha = 0
+        self.fratio = None
+        self.checkBox_Diam1 = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_Diam1.setEnabled(True)
+        self.checkBox_Diam1.setGeometry(QtCore.QRect(18, 248, 65, 20))
+        self.checkBox_Diam1.setAccessibleName("")
+        self.checkBox_Diam1.setObjectName("checkBox_Diam1")
+        self.lineEdit_Diam1 = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Diam1.setGeometry(QtCore.QRect(78, 248, 45, 23))
+        self.lineEdit_Diam1.setObjectName("lineEdit_Diam1")
+        self.lineEdit_Diam1.setText('1.0')
+        self.checkBox_Diam1.setChecked(True)
+        self.checkBox_Diam1.stateChanged.connect(self.selectFitParameters)
+        self.lineEdit_Diam1.setToolTip('Check to include the primary star angular diameter in the fit (unit: mas)')
+
+        self.checkBox_Alpha = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_Alpha.setEnabled(False)
+        self.checkBox_Alpha.setGeometry(QtCore.QRect(138, 248, 62, 20))
+        self.checkBox_Alpha.setAccessibleName("")
+        self.checkBox_Alpha.setObjectName("checkBox_Alpha")
+        self.lineEdit_Alpha = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Alpha.setGeometry(QtCore.QRect(198, 248, 45, 23))
+        self.lineEdit_Alpha.setObjectName("lineEdit_Alpha")
+        self.lineEdit_Alpha.setToolTip('Limb-darkening exponent of the primary star. This parameter is not fitted')
+        self.lineEdit_Alpha.setText('0')
+        self.checkBox_Alpha.stateChanged.connect(self.selectFitParameters)
+
+        self.checkBox_Diam2 = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_Diam2.setEnabled(True)
+        self.checkBox_Diam2.setGeometry(QtCore.QRect(258, 248, 66, 20))
+        self.checkBox_Diam2.setAccessibleName("")
+        self.checkBox_Diam2.setObjectName("checkBox_Diam2")
+        self.lineEdit_Diam2 = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Diam2.setGeometry(QtCore.QRect(320, 248, 45, 23))
+        self.lineEdit_Diam2.setObjectName("lineEdit_Diam2")        
+        self.lineEdit_Diam2.setToolTip('Check to include the secondary star angular diameter in the fit (unit: mas)')
+        self.lineEdit_Diam2.setText('0')
+        self.checkBox_Diam2.stateChanged.connect(self.selectFitParameters)
+
+
+        self.lineEdit_Fratio = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Fratio.setGeometry(QtCore.QRect(78, 284, 45, 23))
+        self.lineEdit_Fratio.setObjectName("lineEdit_Fratio")
+        self.lineEdit_Fratio.setToolTip('Check to include the flux ratio (flux secondary/flux primary) in the fit (unit: %)')
+        self.lineEdit_Fratio.setText('2.0')
+        self.checkBox_Fratio = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_Fratio.setEnabled(True)
+        self.checkBox_Fratio.setGeometry(QtCore.QRect(18, 284, 61, 20))
+        self.checkBox_Fratio.setAccessibleName("")
+        self.checkBox_Fratio.setObjectName("checkBox_Fratio")
+        self.checkBox_Fratio.setChecked(True)
+        self.checkBox_Fratio.stateChanged.connect(self.selectFitParameters)
+
+        self.lineEdit_Fres = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Fres.setGeometry(QtCore.QRect(198, 284, 45, 23))
+        self.lineEdit_Fres.setObjectName("lineEdit_Fres")
+        self.lineEdit_Fres.setToolTip('Check to include an additional resolved flux in the fit (unit: %)')
+        self.lineEdit_Fres.setText('0')
+        self.checkBox_Fres = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_Fres.setEnabled(True)
+        self.checkBox_Fres.setGeometry(QtCore.QRect(138, 284, 53, 20))
+        self.checkBox_Fres.setAccessibleName("")
+        self.checkBox_Fres.setObjectName("checkBox_Fres")
+        self.checkBox_Fres.stateChanged.connect(self.selectFitParameters)
+
+        ######################
+        ####### FIT MAP ######
+        ######################
+
+        self.label_FitMap = QtWidgets.QLabel(self.centralwidget)
+        self.label_FitMap.setGeometry(QtCore.QRect(384, 5, 376, 141))
+        self.label_FitMap.setFont(font)
+        self.label_FitMap.setAccessibleName("")
+        self.label_FitMap.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.label_FitMap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+        self.label_FitMap.setObjectName("label_FitMap")
+
+        self.label_Step = QtWidgets.QLabel(self.centralwidget)
+        self.label_Step.setGeometry(QtCore.QRect(402, 38, 32, 16))
+        self.label_Step.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_Step.setObjectName("label_Step")        
+        self.lineEdit_Step = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Step.setGeometry(QtCore.QRect(438, 36, 45, 23))
+        self.lineEdit_Step.setObjectName("lineEdit_Step")
+        self.lineEdit_Step.setText('5')
+        self.lineEdit_Step.setToolTip('Step of the grid search. Finer grid will take longer')
+
+        self.label_Rmin = QtWidgets.QLabel(self.centralwidget)
+        self.label_Rmin.setGeometry(QtCore.QRect(402, 73, 31, 16))
+        self.label_Rmin.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_Rmin.setObjectName("label_Rmin")
+        self.lineEdit_Rmin = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Rmin.setGeometry(QtCore.QRect(438, 70, 45, 23))
+        self.lineEdit_Rmin.setObjectName("lineEdit_Rmin")
+        self.lineEdit_Rmin.setToolTip('Minimum radius of the grid search (unit: mas)')
+
+        self.label_Rmax = QtWidgets.QLabel(self.centralwidget)
+        self.label_Rmax.setGeometry(QtCore.QRect(402, 109, 31, 16))
+        self.label_Rmax.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_Rmax.setObjectName("label_Rmax")
+        self.lineEdit_Rmax = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Rmax.setGeometry(QtCore.QRect(438, 106, 45, 23))
+        self.lineEdit_Rmax.setObjectName("lineEdit_Rmax")
+        self.lineEdit_Rmax.setToolTip('Maximum radius of the grid search (unit: mas)')
+
+        self.comboBox_Fig = QtWidgets.QComboBox(self.centralwidget)
+        self.comboBox_Fig.setGeometry(QtCore.QRect(523, 34, 90, 26))
+        self.comboBox_Fig.setObjectName("comboBox_Fig")
+        self.label_Fig = QtWidgets.QLabel(self.centralwidget)
+        self.label_Fig.setGeometry(QtCore.QRect(498, 38, 23, 16))
+        self.label_Fig.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_Fig.setObjectName("label_Fig")
+        self.comboBox_Fig.addItems(['Fig 1', 'Fig 2', 'Fig 3', 'Fig 4', 'Fig 5'])
+        self.comboBox_Fig.setToolTip('To plot in different figures and keep the previous ones (set to 5 max)')
+
+        self.checkBox_RemoveComp = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_RemoveComp.setGeometry(QtCore.QRect(498, 70, 118, 20))
+        self.checkBox_RemoveComp.setObjectName("checkBox_RemoveComp")
+        self.checkBox_RemoveComp.setToolTip('Check if you want to analytically remove the previously detected companion and do a search map again')
+
+        self.NDetect = 1
+        self.label_NDetect = QtWidgets.QLabel(self.centralwidget)
+        self.label_NDetect.setGeometry(QtCore.QRect(500, 109, 56, 16))
+        self.label_NDetect.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_NDetect.setObjectName("label_NDetect")
+        self.lineEdit_NDetect = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_NDetect.setGeometry(QtCore.QRect(558, 106, 45, 23))
+        self.lineEdit_NDetect.setObjectName("lineEdit_NDetect")
+        self.lineEdit_NDetect.setText(str(self.NDetect))
+        self.lineEdit_NDetect.setToolTip('Set the number of detected locations.\nSyntax:\n\
+                    --> 1: only the best position will be given\n\
+                    --> 3: the third best positions will be given\n\
+                    --> [3]: the three best positions will be given')
+
+        self.pushButton_FitMap = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_FitMap.setGeometry(QtCore.QRect(622, 13, 129, 129))
+        self.pushButton_FitMap.setObjectName("pushButton")
+        self.pushButton_FitMap.clicked.connect(self.doFitMap)
+        self.pushButton_FitMap.setToolTip('Click to start the grid search')
+
+        #####################
+        ##### BOOTSTRAP #####
+        #####################
+        
+        self.label_Bootstrap = QtWidgets.QLabel(self.centralwidget)
+        self.label_Bootstrap.setGeometry(QtCore.QRect(384, 148, 376, 171))
+        self.label_Bootstrap.setFont(font)
+        self.label_Bootstrap.setAccessibleName("")
+        self.label_Bootstrap.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.label_Bootstrap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+        self.label_Bootstrap.setObjectName("label_Bootstrap")
+            
+        self.label_NBootstrap = QtWidgets.QLabel(self.centralwidget)
+        self.label_NBootstrap.setGeometry(QtCore.QRect(402, 182, 14, 16))
+        self.label_NBootstrap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_NBootstrap.setObjectName("label_NBootstrap")
+        self.lineEdit_Nbootstrap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Nbootstrap.setGeometry(QtCore.QRect(418, 180, 45, 23))
+        self.lineEdit_Nbootstrap.setObjectName("lineEdit_Nbootstrap")
+        self.lineEdit_Nbootstrap.setToolTip('Number of bootstrap sample')
+        self.lineEdit_Nbootstrap.setText('1000')
+
+        self.checkBox_MCBootstrap = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_MCBootstrap.setGeometry(QtCore.QRect(472, 181, 46, 20))
+        self.checkBox_MCBootstrap.setObjectName("checkBox_MCBootstrap")
+        
+        self.label_FigBootstrap = QtWidgets.QLabel(self.centralwidget)
+        self.label_FigBootstrap.setGeometry(QtCore.QRect(524, 182, 23, 16))
+        self.label_FigBootstrap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_FigBootstrap.setObjectName("label_FigBootstrap")
+        self.comboBox_FigBootstrap = QtWidgets.QComboBox(self.centralwidget)
+        self.comboBox_FigBootstrap.setGeometry(QtCore.QRect(547, 178, 75, 26))
+        self.comboBox_FigBootstrap.setObjectName("comboBox_FigBootstrap")
+        self.comboBox_FigBootstrap.addItems(['Fig 1', 'Fig 2', 'Fig 3', 'Fig 4', 'Fig 5'])
+        self.comboBox_FigBootstrap.setToolTip('To plot in different figures and keep the previous ones (set to 5 max)')
+        
+        self.checkBox_XBootstrap = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_XBootstrap.setEnabled(True)
+        self.checkBox_XBootstrap.setGeometry(QtCore.QRect(398, 213, 61, 20))
+        self.checkBox_XBootstrap.setAccessibleName("")
+        self.checkBox_XBootstrap.setObjectName("checkBox_XBootstrap")
+        self.checkBox_XBootstrap.setChecked(True)
+        self.lineEdit_XBootstrap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_XBootstrap.setGeometry(QtCore.QRect(434, 212, 70, 23))
+        self.lineEdit_XBootstrap.setObjectName("lineEdit_XBootstrap")
+        self.lineEdit_XBootstrap.setToolTip('Check to include X in the bootstrapping (unit: mas)')
+
+        self.checkBox_YBootstrap = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_YBootstrap.setEnabled(True)
+        self.checkBox_YBootstrap.setGeometry(QtCore.QRect(514, 213, 36, 20))
+        self.checkBox_YBootstrap.setAccessibleName("")
+        self.checkBox_YBootstrap.setObjectName("checkBox_YBootstrap")
+        self.checkBox_YBootstrap.setChecked(True)
+        self.lineEdit_YBootstrap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_YBootstrap.setGeometry(QtCore.QRect(550, 212, 71, 23))
+        self.lineEdit_YBootstrap.setObjectName("lineEdit_YBootstrap")
+        self.lineEdit_YBootstrap.setToolTip('Check to include Y in the bootstrapping (unit: mas)')
+
+        self.checkBox_Diam1Bootstrap = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_Diam1Bootstrap.setEnabled(True)
+        self.checkBox_Diam1Bootstrap.setGeometry(QtCore.QRect(398, 249, 65, 20))
+        self.checkBox_Diam1Bootstrap.setAccessibleName("")
+        self.checkBox_Diam1Bootstrap.setObjectName("checkBox_Diam1Bootstrap")
+        self.checkBox_Diam1Bootstrap.setChecked(True)
+        self.lineEdit_Diam1Bootstrap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Diam1Bootstrap.setGeometry(QtCore.QRect(458, 248, 45, 23))
+        self.lineEdit_Diam1Bootstrap.setObjectName("lineEdit_Diam1Bootstrap")
+        self.lineEdit_Diam1Bootstrap.setToolTip('Check to include the primary angular diameter in the bootstrapping (unit: mas)')
+
+        self.checkBox_Diam2Bootstrap = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_Diam2Bootstrap.setEnabled(True)
+        self.checkBox_Diam2Bootstrap.setGeometry(QtCore.QRect(514, 249, 66, 20))
+        self.checkBox_Diam2Bootstrap.setAccessibleName("")
+        self.checkBox_Diam2Bootstrap.setObjectName("checkBox_Diam2Bootstrap")   
+        self.lineEdit_Diam2Bootstrap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Diam2Bootstrap.setGeometry(QtCore.QRect(576, 248, 45, 23))
+        self.lineEdit_Diam2Bootstrap.setObjectName("lineEdit_Diam2Bootstrap") 
+        self.lineEdit_Diam2Bootstrap.setToolTip('Check to include the secondary angular diameter in the bootstrapping (unit: mas)')
+
+        self.checkBox_FratioBootstrap = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_FratioBootstrap.setEnabled(True)
+        self.checkBox_FratioBootstrap.setGeometry(QtCore.QRect(398, 285, 61, 20))
+        self.checkBox_FratioBootstrap.setAccessibleName("")
+        self.checkBox_FratioBootstrap.setObjectName("checkBox_FratioBootstrap")
+        self.checkBox_FratioBootstrap.setChecked(True)
+        self.lineEdit_FratioBootstrap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_FratioBootstrap.setGeometry(QtCore.QRect(458, 284, 45, 23))
+        self.lineEdit_FratioBootstrap.setObjectName("lineEdit_FratioBootstrap")
+        self.lineEdit_FratioBootstrap.setToolTip('Check to include the flux ratio secondary/primary in the bootstrapping (unit: %)')
+
+        self.checkBox_FresBootstrap = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_FresBootstrap.setEnabled(True)
+        self.checkBox_FresBootstrap.setGeometry(QtCore.QRect(514, 285, 53, 20))
+        self.checkBox_FresBootstrap.setAccessibleName("")
+        self.checkBox_FresBootstrap.setObjectName("checkBox_FresBootstrap")
+        self.lineEdit_FresBootstrap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_FresBootstrap.setGeometry(QtCore.QRect(576, 284, 45, 23))
+        self.lineEdit_FresBootstrap.setObjectName("lineEdit_FresBootstrap")
+        self.lineEdit_FresBootstrap.setToolTip('Check to include a resolved flux in the bootstrapping (unit: %)')
+
+        self.pushButton_Bootstrap = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_Bootstrap.setGeometry(QtCore.QRect(622, 154, 129, 163))
+        self.pushButton_Bootstrap.setObjectName("pushButton_Bootstrap")
+        self.pushButton_Bootstrap.setToolTip('Start bootstrapping')
+        self.pushButton_Bootstrap.clicked.connect(self.doBootstrap)
+
+        #########################
+        ##### DETECTION MAP #####
+        ######################### 
+
+        self.label_DetectionMap = QtWidgets.QLabel(self.centralwidget)
+        self.label_DetectionMap.setGeometry(QtCore.QRect(5, 322, 755, 103))
+        self.label_DetectionMap.setFont(font)
+        self.label_DetectionMap.setAccessibleName("")
+        self.label_DetectionMap.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.label_DetectionMap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+        self.label_DetectionMap.setObjectName("label_DetectionMap")
+
+        self.label_StepDetectionMap = QtWidgets.QLabel(self.centralwidget)
+        self.label_StepDetectionMap.setGeometry(QtCore.QRect(24, 361, 32, 16))
+        self.label_StepDetectionMap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_StepDetectionMap.setObjectName("label_StepDetectionMap")
+        self.lineEdit_StepDetectionMap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_StepDetectionMap.setGeometry(QtCore.QRect(60, 358, 45, 23))
+        self.lineEdit_StepDetectionMap.setObjectName("lineEdit_StepDetectionMap")
+        self.lineEdit_StepDetectionMap.setToolTip('Grid step to estimate the detection limits')
+        self.lineEdit_StepDetectionMap.setText('5')
+
+        self.label_RminDetectionMap = QtWidgets.QLabel(self.centralwidget)
+        self.label_RminDetectionMap.setGeometry(QtCore.QRect(116, 361, 31, 16))
+        self.label_RminDetectionMap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_RminDetectionMap.setObjectName("label_RminDetectionMap")
+        self.lineEdit_RminDetectionMap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_RminDetectionMap.setGeometry(QtCore.QRect(150, 358, 45, 23))
+        self.lineEdit_RminDetectionMap.setObjectName("lineEdit_RminDetectionMap")
+        self.lineEdit_RminDetectionMap.setToolTip('Minimum radius to estimate the detection limits (unit: mas)')
+
+        self.lineEdit_RmaxDetectionMap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_RmaxDetectionMap.setGeometry(QtCore.QRect(244, 358, 45, 23))
+        self.lineEdit_RmaxDetectionMap.setObjectName("lineEdit_RmaxDetectionMap")
+        self.label_RmaxDetectionMap = QtWidgets.QLabel(self.centralwidget)
+        self.label_RmaxDetectionMap.setGeometry(QtCore.QRect(210, 361, 31, 16))
+        self.label_RmaxDetectionMap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_RmaxDetectionMap.setObjectName("label_RmaxDetectionMap")
+        self.lineEdit_RmaxDetectionMap.setToolTip('Maximum radius to estimate the detection limits (unit: mas)')
+
+        self.checkBox_RemoveCompDetectionMap = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_RemoveCompDetectionMap.setGeometry(QtCore.QRect(306, 359, 118, 20))
+        self.checkBox_RemoveCompDetectionMap.setObjectName("checkBox_RemoveCompDetectionMap")
+        self.checkBox_RemoveCompDetectionMap.setToolTip('Check to remove the previously detected companion\n(necessary to unbiased detection limits)')
+    
+        self.label_FigDetectionMap = QtWidgets.QLabel(self.centralwidget)
+        self.label_FigDetectionMap.setGeometry(QtCore.QRect(498, 361, 23, 16))
+        self.label_FigDetectionMap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_FigDetectionMap.setObjectName("label_FigDetectionMap")
+        self.comboBox_FigDetectionMap = QtWidgets.QComboBox(self.centralwidget)
+        self.comboBox_FigDetectionMap.setGeometry(QtCore.QRect(523, 357, 90, 26))
+        self.comboBox_FigDetectionMap.setObjectName("comboBox_FigDetectionMap")
+        self.comboBox_FigDetectionMap.addItems(['Fig 1', 'Fig 2', 'Fig 3', 'Fig 4', 'Fig 5'])
+        self.comboBox_FigDetectionMap.setToolTip('To plot in different figures and keep the previous ones (set to 5 max)')
+
+        self.label_NSigmaDetectionMap = QtWidgets.QLabel(self.centralwidget)
+        self.label_NSigmaDetectionMap.setGeometry(QtCore.QRect(24, 396, 50, 16))
+        self.label_NSigmaDetectionMap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_NSigmaDetectionMap.setObjectName("label_NSigmaDetectionMap") 
+        self.lineEdit_NSigmaDetectionMap = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_NSigmaDetectionMap.setGeometry(QtCore.QRect(76, 393, 45, 23))
+        self.lineEdit_NSigmaDetectionMap.setObjectName("lineEdit_NSigmaDetectionMap")
+        self.lineEdit_NSigmaDetectionMap.setText('3')       
+        self.lineEdit_NSigmaDetectionMap.setToolTip('Set the detection limit level (default is 3sigmas)')
+                
+        self.checkBox_DrawMaps = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_DrawMaps.setGeometry(QtCore.QRect(134, 394, 58, 20))
+        self.checkBox_DrawMaps.setObjectName("checkBox_DrawMaps")
+        self.checkBox_DrawMaps.setChecked(True)
+        self.checkBox_DrawMaps.setToolTip('Check to also plot the 2D maps (radial profile is also plotted)')
+
+        self.comboBox_Method = QtWidgets.QComboBox(self.centralwidget)
+        self.comboBox_Method.setGeometry(QtCore.QRect(254, 392, 90, 26))
+        self.comboBox_Method.setObjectName("comboBox_Method")
+        self.comboBox_Method.addItems(['Both', 'Gallenne','Absil'])
+        self.label_Method = QtWidgets.QLabel(self.centralwidget)
+        self.label_Method.setGeometry(QtCore.QRect(204, 396, 51, 16))
+        self.label_Method.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_Method.setObjectName("label_Method")
+        self.comboBox_Method.setToolTip('Select the method to estimate the detection limit, Absil method, Gallenne method or both\n(see CANDID paper for explanations)')
+
+        self.checkBox_FullMap = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_FullMap.setGeometry(QtCore.QRect(358, 394, 77, 20))
+        self.checkBox_FullMap.setObjectName("checkBox_FullMap")
+        self.checkBox_FullMap.setToolTip('Check this box to have the complete square 2Rmax x 2Rmax map\n(default is a circle of radius Rmax, used for the radial profile).\nUseful if the map is saved in fits format for further purposes')
+
+        self.pushButton_detectionMap = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_detectionMap.setGeometry(QtCore.QRect(622, 328, 129, 95))
+        self.pushButton_detectionMap.setObjectName("pushButton_detectionMap")
+        self.pushButton_detectionMap.clicked.connect(self.doDetectionMap)
+        self.pushButton_detectionMap.setToolTip('Start the detection limit calculation')
+
+        self.pushButton_SaveFits = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_SaveFits.setGeometry(QtCore.QRect(525, 388, 87, 34))
+        self.pushButton_SaveFits.setObjectName("pushButton_SaveFits")
+        self.pushButton_SaveFits.setToolTip('Save the detection limit map in fits format')
+        self.pushButton_SaveFits.clicked.connect(self.saveFits)
+
+        self.label_PaperLink = QtWidgets.QLabel(self.centralwidget)
+        self.label_PaperLink.setGeometry(QtCore.QRect(622, 428, 135, 16))
+        self.label_PaperLink.setObjectName("label_PaperLink")
+        self.label_PaperLink.setOpenExternalLinks(True)
+        
+        MainWindow.setCentralWidget(self.centralwidget)
+
+        self.retranslateUi(MainWindow)
+
+    def retranslateUi(self, MainWindow):
+        _translate = QtCore.QCoreApplication.translate
+        MainWindow.setWindowTitle('CANDID: [C]ompanion [A]nalysis and [N]on-[D]etection in [I]nterferometric [D]ata')
+        self.label_Setup.setText(_translate("MainWindow", "Setup"))
+        self.pushButton_LoadOI.setText(_translate("MainWindow", "Load Oifits"))
+        self.pushButton_ClosePlots.setText(_translate("MainWindow", "Close Plots"))
+        self.pushButton_Quit.setText(_translate("MainWindow", "Quit"))
+        self.label_ColorMap.setText(_translate("MainWindow", "Color map:"))
+        self.label_Ncores.setText(_translate("MainWindow", "N Cores:"))
+        self.checkBox_Title.setText(_translate("MainWindow", "Titles"))
+        self.label_ExecTime.setText(_translate("MainWindow", "Exec. Time(s):"))
+        self.label_Instrument.setText(_translate("MainWindow", "Instrument:"))
+        self.label_Parameters.setText(_translate("MainWindow", "Fitted Parameters"))
+        self.checkBox_CP.setText(_translate("MainWindow", "CP"))
+        self.checkBox_V2.setText(_translate("MainWindow", "V2"))
+        self.checkBox_T3amp.setText(_translate("MainWindow", "T3amp"))
+        self.checkBox_Diam1.setText(_translate("MainWindow", "diam1:"))
+        self.checkBox_Alpha.setText(_translate("MainWindow", "alpha:"))
+        self.checkBox_Diam2.setText(_translate("MainWindow", "diam2:"))
+        self.checkBox_Fratio.setText(_translate("MainWindow", "fratio:"))
+        self.checkBox_Fres.setText(_translate("MainWindow", "fres:"))
+        self.label_FitMap.setText(_translate("MainWindow", "Fit Map"))
+        self.label_Step.setText(_translate("MainWindow", "Step:"))
+        self.label_Rmin.setText(_translate("MainWindow", "rmin:"))
+        self.label_NBootstrap.setText(_translate("MainWindow", "N:"))
+        self.pushButton_FitMap.setText(_translate("MainWindow", "Map"))
+        self.label_Fig.setText(_translate("MainWindow", "Fig:"))
+        self.checkBox_RemoveComp.setText(_translate("MainWindow", "Remove Comp."))
+        self.label_DetectionMap.setText(_translate("MainWindow", "Detection Map"))
+        self.label_Bootstrap.setText(_translate("MainWindow", "Bootstrap"))
+        self.pushButton_detectionMap.setText(_translate("MainWindow", "Map"))
+        self.pushButton_Bootstrap.setText(_translate("MainWindow", "Bootstrap"))
+        self.label_FigBootstrap.setText(_translate("MainWindow", "Fig:"))
+        self.checkBox_FresBootstrap.setText(_translate("MainWindow", "fres:"))
+        self.checkBox_Diam1Bootstrap.setText(_translate("MainWindow", "diam1:"))
+        self.checkBox_Diam2Bootstrap.setText(_translate("MainWindow", "diam2:"))
+        self.checkBox_FratioBootstrap.setText(_translate("MainWindow", "fratio:"))
+        self.checkBox_YBootstrap.setText(_translate("MainWindow", "y:"))
+        self.checkBox_XBootstrap.setText(_translate("MainWindow", "x:"))
+        self.label_RminDetectionMap.setText(_translate("MainWindow", "rmin:"))
+        self.label_StepDetectionMap.setText(_translate("MainWindow", "Step:"))
+        self.checkBox_RemoveCompDetectionMap.setText(_translate("MainWindow", "Remove Comp."))
+        self.label_FigDetectionMap.setText(_translate("MainWindow", "Fig:"))
+        self.label_NSigmaDetectionMap.setText(_translate("MainWindow", "Nsigma:"))
+        self.checkBox_DrawMaps.setText(_translate("MainWindow", "Maps"))
+        self.label_NDetect.setText(_translate("MainWindow", "N detect:"))
+        self.label_RmaxDetectionMap.setText(_translate("MainWindow", "rmax:"))
+        self.label_Method.setText(_translate("MainWindow", "Method:"))
+        self.label_Rmax.setText(_translate("MainWindow", "rmax"))
+        self.pushButton_SaveFits.setText(_translate("MainWindow", "Save Fits"))
+        self.checkBox_FullMap.setText(_translate("MainWindow", "Full map"))
+        urlLink = "<a href=\"https://ui.adsabs.harvard.edu/abs/2015A%26A...579A..68G/abstract\"> Gallenne et al. (2015)</a>"
+        self.label_PaperLink.setText(_translate("MainWindow", urlLink))
+        self.checkBox_MCBootstrap.setText(_translate("MainWindow", "MC"))
+
+    def saveFits(self):
+        
+        outfile = self.lineEdit_NSigmaDetectionMap.text()+'sigma_detection_limit_map.fits'
+        self.candid.saveAsFits('./'+outfile, n_sigma=int(self.lineEdit_NSigmaDetectionMap.text()))
+
+    def doDetectionMap(self):
+
+        rmin = float(self.lineEdit_RminDetectionMap.text())
+        rmax = float(self.lineEdit_RmaxDetectionMap.text())
+        fig = int(self.comboBox_FigDetectionMap.currentText()[-1])
+                
+        if self.comboBox_Method.currentText()=='Both':
+            method = ['Gallenne','Absil']
+        else:
+            method = self.comboBox_Method.currentText()
+
+        if self.checkBox_RemoveCompDetectionMap.isChecked():
+            try:
+                comp = self.candid.bestFit['best']
+            except:
+                comp = None
+        else:
+            comp = None
+
+        self.candid.detectionLimit(float(self.lineEdit_StepDetectionMap.text()), fig=fig, methods=method,
+                                   drawMaps=self.checkBox_DrawMaps.isChecked(), n_Sigma=int(self.lineEdit_NSigmaDetectionMap.text()),
+                                   removeCompanion=comp, fullMap=self.checkBox_FullMap.isChecked())
+
+    def doBootstrap(self):
+
+        if not self.checkBox_XBootstrap.isChecked():
+            self.doNotFit['x'] = self.lineEdit_XBootstrap.text()
+        else:
+            try:
+                del self.doNotFit['x']
+            except:
+                pass
+
+        if not self.checkBox_YBootstrap.isChecked():
+            self.doNotFit['y'] = self.lineEdit_YBootstrap.text()
+        else:
+            try:
+                del self.doNotFit['y']
+            except:
+                pass
+            
+        if not self.checkBox_Diam1Bootstrap.isChecked():
+            self.doNotFit['diam*'] = self.lineEdit_Diam1Bootstrap.text()
+        else:
+            try:
+                del self.doNotFit['diam*']
+            except:
+                pass
+
+        if not self.checkBox_Diam2Bootstrap.isChecked():
+            self.doNotFit['diamc'] = self.lineEdit_Diam2Bootstrap.text()
+        else:
+            try:
+                del self.doNotFit['diamc']
+            except:
+                pass
+            
+        if not self.checkBox_FratioBootstrap.isChecked():
+            self.doNotFit['f'] = self.lineEdit_FratioBootstrap.text()
+        else:
+            try:
+                del self.doNotFit['f']
+            except:
+                pass
+
+        if not self.checkBox_FresBootstrap.isChecked():
+            self.doNotFit['fres'] = self.lineEdit_FresBootstrap.text()
+        else:
+            try:
+                del self.doNotFit['fres']
+            except:
+                pass
+
+        # if self.checkBox_MCBootstrap.isChecked():
+        #     MC = True
+        # else:
+        #     MC = False
+
+        fig = int(self.comboBox_FigBootstrap.currentText()[-1])
+        self.candid.fitBoot(int(self.lineEdit_Nbootstrap.text()), fig=fig, doNotFit=self.doNotFit, monteCarlo=self.checkBox_MCBootstrap.isChecked())
+        
+    def doFitMap(self):
+        
+        candid.CONFIG['long exec warning'] = int(self.lineEdit_ExecTime.text())
+        candid.CONFIG['Ncores'] = int(self.lineEdit_Ncores.text())
+        step = float(self.lineEdit_Step.text())
+        rmin = float(self.lineEdit_Rmin.text())
+        rmax = float(self.lineEdit_Rmax.text())
+        fig = int(self.comboBox_Fig.currentText()[-1])
+        self.candid.alpha = self.alpha
+
+        try:
+            self.nbDetect = int(self.lineEdit_NDetect.text())
+        except:
+            self.nbDetect = [int(self.lineEdit_NDetect.text()[1:-1])]
+        if self.checkBox_RemoveComp.isChecked():
+            try:
+                self.removeComp = self.candid.bestFit['best']
+            except:
+                self.removeComp = None
+        else:
+            self.removeComp = None
+
+        try:
+            if not self.checkBox_Diam1.isChecked():
+                self.doNotFit['diam*'] = float(self.lineEdit_Diam1.text())
+            else:
+                try:
+                    del self.doNotFit['diam*']
+                except:
+                    pass
+        except:
+            pass
+
+        try:
+            if float(self.lineEdit_Diam2.text()) > 0:  
+                self.addParam['diamc'] = float(self.lineEdit_Diam2.text())
+                if not self.checkBox_Diam2.isChecked():
+                    self.doNotFit['diamc'] = float(self.lineEdit_Diam2.text())
+                else:
+                    try:
+                        del self.doNotFit['diamc']
+                    except:
+                        pass
+            else:
+                try:
+                    del self.addParam['diamc']
+                except:
+                    pass 
+        except:
+            pass
+
+        try:
+            if not self.checkBox_Fratio.isChecked():
+                self.doNotFit['f'] = float(self.lineEdit_Fratio.text())
+                self.fratio = float(self.lineEdit_Fratio.text())
+            else:
+                try:
+                    del self.doNotFit['f']
+                except:
+                    pass
+        except:
+            pass
+
+        try:
+            if float(self.lineEdit_Fres.text()) > 0:
+                self.addParam['fres'] = float(self.lineEdit_Fres.text())
+                if not self.checkBox_Fres.isChecked():
+                    self.doNotFit['fres'] = float(self.lineEdit_Fres.text())
+                else:
+                    try:      
+                        del self.doNotFit['fres']
+                    except:
+                        pass
+            else:
+                try:
+                    del self.addParam['fres']
+                except:
+                    pass
+        except:
+            pass
+
+        self.candid.fitMap(step, rmin=rmin, rmax=rmax, fig=fig, doNotFit=self.doNotFit, addParam=self.addParam,
+                           fratio= self.fratio if 'f' in self.doNotFit.keys() else 2.0, nbDetect=self.nbDetect,
+                           removeCompanion=self.removeComp)
+
+        self.X = self.candid.bestFit['best']['x']
+        self.Y = self.candid.bestFit['best']['y']
+        self.fratio = self.candid.bestFit['best']['f']
+        self.diam1 = self.candid.bestFit['best']['diam*']
+        self.diam2 = self.candid.bestFit['best']['diamc'] if 'diamc' in self.candid.bestFit['best'].keys() else 0
+        self.fres = self.candid.bestFit['best']['fres'] if 'fres' in self.candid.bestFit['best'].keys() else 0
+
+        self.lineEdit_XBootstrap.setText(str(np.round(self.X,3)))
+        self.lineEdit_YBootstrap.setText(str(np.round(self.Y,3)))
+        self.lineEdit_Diam1Bootstrap.setText(str(np.round(self.diam1,3)))
+        self.lineEdit_Diam2Bootstrap.setText(str(np.round(self.diam2,3)))
+        self.lineEdit_FratioBootstrap.setText(str(np.round(self.fratio,2)))
+        self.lineEdit_FresBootstrap.setText(str(np.round(self.fres,3)))
+
+        # self.lineEdit_Step.setText(str(np.round(self.candid.stepOptFitMap,3)))    
+        self.lineEdit_StepDetectionMap.setText(str(np.round(self.candid.stepOptFitMap,3)))
+
+    def selectFitParameters(self):
+        
+        if not self.checkBox_Diam1.isChecked():
+            self.doNotFit['diam*'] = float(self.lineEdit_Diam1.text())
+        else:
+            try:      
+                del self.doNotFit['diam*']
+            except:
+                pass
+
+        if not self.checkBox_Diam2.isChecked():
+            self.doNotFit['diamc'] = float(self.lineEdit_Diam2.text())
+        else:
+            try:
+                del self.doNotFit['diamc']
+            except:
+                pass
+            
+        if float(self.lineEdit_Alpha.text()) > 0:
+            self.alpha = float(self.lineEdit_Alpha.text())
+        else:
+            self.alpha = 0.
+
+        if not self.checkBox_Fratio.isChecked():
+            self.doNotFit['f'] = float(self.lineEdit_Fratio.text())
+            self.fratio = float(self.lineEdit_Fratio.text())
+        else:
+            self.fratio = None
+            try:      
+                del self.doNotFit['f']
+            except:
+                pass
+            
+        if float(self.lineEdit_Fres.text()) > 0:
+            self.addParam['fres'] = float(self.lineEdit_Fres.text())
+            if not self.checkBox_Fres.isChecked():
+                self.doNotFit['fres'] = float(self.lineEdit_Fres.text())
+            else:
+                try:      
+                    del self.doNotFit['fres']
+                except:
+                    pass
+        else:
+            try:
+                del self.addParam['fres']
+            except:
+                pass
+        
+    def selectInstrument(self):
+        try:
+            if self.tmp:
+                if self.comboBox_Instrument.currentText() == 'All':
+                    self.candid.instruments = self.allInstruments
+                    print('\n---> Selecting all instruments: ', self.candid.instruments)
+                else:
+                    self.candid.instruments = self.comboBox_Instrument.currentText()
+                    print('\n---> Selecting instrument: ', self.candid.instruments)
+        except:
+            pass
+
+    def closeAllPlots(self):
+        plt.close('all')
+
+    def changeExecTime(self):
+        try:
+            candid.CONFIG['long exec warning'] = int(self.lineEdit_ExecTime.text())
+        except:
+            candid.CONFIG['long exec warning'] = 300
+        print('\n---> Setting exceution time warning to %is' %candid.CONFIG['long exec warning'])
+
+    def selectSuptitle(self):
+        if self.checkBox_Title.isChecked():
+            candid.CONFIG['suptitle'] = True
+        else:
+            candid.CONFIG['suptitle'] = False
+        
+    def selectColorMap(self):
+        candid.CONFIG['color map'] = self.comboBox_ColorMap.currentText()
+        print('\n---> Setting color map to %s' %candid.CONFIG['color map'])
+
+    def changeNcores(self):
+        candid.CONFIG['Ncores'] = int(self.lineEdit_Ncores.text())
+        print('\n---> Setting multiprocessing to %i cores' %candid.CONFIG['Ncores'])
+
+    def selectObservables(self):
+        
+        try:
+            if not self.checkBox_V2.isChecked():
+                self.candid.observables.remove('v2')
+            else:
+                if 'v2' not in self.candid.observables:
+                    self.candid.observables.append('v2')
+        except:
+            pass
+        try:
+            if not self.checkBox_CP.isChecked():
+                self.candid.observables.remove('cp')
+            else:
+                if 'cp' not in self.candid.observables:
+                    self.candid.observables.append('cp')
+        except:
+            pass
+        try:
+            if not self.checkBox_T3amp.isChecked():
+                self.candid.observables.remove('t3')
+            else:
+                if 't3' not in self.candid.observables:
+                    self.candid.observables.append('t3')
+        except:
+            pass
+        
+    def openOI(self):
+        files, _ = QtWidgets.QFileDialog.getOpenFileNames(self.centralwidget,"Select OI data", "","Text Files (*.fits *.oifits);;All Files (*)")#,
+        self.tmp = 0
+        if files == []:
+            pass
+        else:
+            self.comboBox_Instrument.clear()
+            self.candid = candid.Open(files)
+            if len(self.candid.instruments)>1:
+                self.comboBox_Instrument.addItem('All')
+                self.comboBox_Instrument.addItems(self.candid.instruments)
+            else:
+                # self.allInstruments = self.candid.instruments*1
+                self.comboBox_Instrument.addItems(self.candid.instruments)
+            self.tmp = 1
+            self.allInstruments = self.candid.instruments
+            self.lineEdit_Rmin.setText(str(np.round(self.candid.rmin,1)))
+            self.lineEdit_Rmax.setText(str(np.round(self.candid.rmax,1)))
+            self.lineEdit_RminDetectionMap.setText(str(np.round(self.candid.rmin,1)))
+            self.lineEdit_RmaxDetectionMap.setText(str(np.round(self.candid.rmax,1)))
+
+        if files == []:
+            Nfiles = '0'
+        elif len(files)>1:
+            Nfiles = '\n'
+            for n in files:
+                Nfiles = Nfiles+n+'\n'
+        else:
+            Nfiles = files[0]
+                    
+        self.pushButton_LoadOI.setToolTip('Select oifit file(s) to load\n\nLoaded file(s): '+Nfiles)
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    MainWindow = QtWidgets.QMainWindow()
+    ui = Ui_MainWindow()
+    ui.setupUi(MainWindow)
+    MainWindow.show()
+    sys.exit(app.exec_())

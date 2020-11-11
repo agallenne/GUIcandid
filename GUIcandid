@@ -785,6 +785,7 @@ class Ui_MainWindow(object):
 
         # self.lineEdit_Step.setText(str(np.round(self.candid.stepOptFitMap,3)))    
         self.lineEdit_StepDetectionMap.setText(str(np.round(self.candid.stepOptFitMap,3)))
+        self.lineEdit_Step.setText(str(np.round(self.candid.stepOptFitMap,3)))
 
     def selectFitParameters(self):
         

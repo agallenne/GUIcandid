@@ -42,6 +42,10 @@ from astropy import wcs ### Alex
 import matplotlib.ticker as mtick ### Alex
 from matplotlib.ticker import MultipleLocator ### Alex
 
+import progressbar
+import matplotlib.cm as cm
+
+
 #__version__ = '0.1 | 2014/11/25'
 #__version__ = '0.2 | 2015/01/07'  # big clean
 #__version__ = '0.3 | 2015/01/14'  # add Alex contrib and FLAG taken into account
@@ -252,7 +256,7 @@ def _VbinSlow(uv, param):
 
 try:
     # -- Using Cython visibility function
-    import cyvis
+    import cyvis_
     def _VbinCy(uv, p):
         N = np.size(uv[0])
         if not 'diam*' in p.keys():
@@ -1212,6 +1216,7 @@ class Open:
             self.diam = None
             self.ediam = np.nan
             self.chi2_UD = 1.0
+            
         return
 
     def _initOiData(self):
@@ -1280,6 +1285,8 @@ class Open:
                             diam = 8.2
                         if 'NACO' in  name:                                         ### Alex
                             diam = 8.2                                              ### Alex
+                        if 'SAM' in  name:                                         ### Alex
+                            diam = 8.2                                              ### Alex
                         if 'SPHERE_DATA' in  name:                                         ### Alex
                             diam = 8.2                                              ### Alex
                 self.telArray[name] = diam
@@ -1303,11 +1310,13 @@ class Open:
         for hdu in self._fitsHandler[1:]:
             if hdu.header['EXTNAME'] in ['OI_T3', 'OI_VIS2'] and testInst(hdu):
                 ins = hdu.header['INSNAME']
-                if type(ins) is not str:        ### Alex
-                    ins = 'SAM'              ### Alex
+                # if type(ins) is not str:        ### Alex
+                #     ins = 'SAM'              ### Alex
                     
                 arr = hdu.header['ARRNAME']
                 if arr=='NACO':                 ### Alex
+                    self.telArray[arr] = 8.2    ### Alex
+                if arr=='SAM':                 ### Alex
                     self.telArray[arr] = 8.2    ### Alex
                 if arr=='SPHERE_DATA':                 ### Alex
                     self.telArray[arr] = 8.2    ### Alex
@@ -1370,16 +1379,17 @@ class Open:
                               self.wavel[ins][None,:]+0*hdu.data['V1COORD'][:,None],
                               hdu.data['MJD'][:,None]+0*self.wavel[ins][None,:],
                               data, err])
-                    else:
+                    elif largeCP=='iCP': ###ALEX
                         # -- complex closure phase: t3 normalized, i.e exp(i*CP)
-                        # self._rawData.append(['icp;'+ins,
-                        #     hdu.data['U1COORD'][:,None]+0*self.wavel[ins][None,:],
-                        #     hdu.data['V1COORD'][:,None]+0*self.wavel[ins][None,:],
-                        #     hdu.data['U2COORD'][:,None]+0*self.wavel[ins][None,:],
-                        #     hdu.data['V2COORD'][:,None]+0*self.wavel[ins][None,:],
-                        #     self.wavel[ins][None,:]+0*hdu.data['V1COORD'][:,None],
-                        #     hdu.data['MJD'][:,None]+0*self.wavel[ins][None,:],
-                        #     np.exp(1j*data), err])
+                        self._rawData.append(['icp;'+ins,
+                            hdu.data['U1COORD'][:,None]+0*self.wavel[ins][None,:],
+                            hdu.data['V1COORD'][:,None]+0*self.wavel[ins][None,:],
+                            hdu.data['U2COORD'][:,None]+0*self.wavel[ins][None,:],
+                            hdu.data['V2COORD'][:,None]+0*self.wavel[ins][None,:],
+                            self.wavel[ins][None,:]+0*hdu.data['V1COORD'][:,None],
+                            hdu.data['MJD'][:,None]+0*self.wavel[ins][None,:],
+                            np.exp(1j*data), err])
+                    else:
                         # -- cos(CP) and sin(CP)
                         self._rawData.append(['ccp;'+ins,
                             hdu.data['U1COORD'][:,None]+0*self.wavel[ins][None,:],
@@ -1643,6 +1653,7 @@ class Open:
             p.close()
             p.join()
         return (time.time()-t)/len(params)
+            
     def _cb_chi2Map(self, r):
         """
         callback function for chi2Map()
@@ -1918,7 +1929,7 @@ class Open:
             self.rmax = rmax
         result['call']['rmax']=self.rmax
 
-        result['call']['fratio']=fratio
+        result['call']['fratio']=fratio if 'f' not in doNotFit.keys() else doNotFit['f']   ### Alex
         result['call']['addParam']=addParam
         result['call']['doNotFit']=doNotFit
 
@@ -1959,6 +1970,11 @@ class Open:
 
         if self._dataheader!={}:
             print('found injected companion at', self._dataheader)
+
+        if 'diam*' in doNotFit: ### Alex
+            self.diam = doNotFit['diam*']
+
+        self.doNotFit = doNotFit  ### Alex
 
         self.fitUD()
         if self.chi2_UD ==0:
@@ -2024,10 +2040,11 @@ class Open:
         #t0 = time.time()
         params = []
         t0 = time.time()
-        print(doNotFit)
+
         for x,y in XY:
             if x**2+y**2>=self.rmin**2 and x**2+y**2<=self.rmax**2:
-                tmp={'diam*': self.diam if 'diam*' not in doNotFit.keys() else doNotFit['diam*'], 'f':fratio, 'x':x, 'y':y, '_k':k,  ### Alex
+                tmp={'diam*': self.diam if 'diam*' not in doNotFit.keys() else doNotFit['diam*'],
+                     'f':fratio if 'f' not in doNotFit.keys() else doNotFit['f'] , 'x':x, 'y':y, '_k':k,  ### Alex
                      'alpha*':self.alpha}
                 for _k in self.dwavel.keys():
                     tmp['dwavel;'+_k] = self.dwavel[_k]
@@ -2106,33 +2123,67 @@ class Open:
             plt.legend()
 
         # -- count number of unique minima, start with first one, add N sigma:
+        # allMin = [self.allFits[0]]
+        # allMin[0]['nsigma'] =  _nSigmas(self.chi2_UD,  allMin[0]['chi2'], self.ndata()-1)
+        # for f in self.allFits:
+        #     chi2 = []
+        #     for a in allMin:
+        #         tmp, n = 0., 0.
+        #         for k in ['x', 'y', 'f', 'diam']:
+        #             if k in f['uncer'].keys() and k in a['uncer'].keys() and\
+        #                     f['uncer'][k]!=0 and a['uncer'][k]!=0:
+        #                 if k == 'f':
+        #                     tmp += (f['best'][k]-a['best'][k])**2/(0.01)**2
+        #                 elif k == 'diam':
+        #                     tmp += (f['best'][k]-a['best'][k])**2/(0.1*self.minSpatialScale)**2
+        #                 else: # -- for x and y
+        #                     tmp += (f['best'][k]-a['best'][k])**2/(0.5*self.minSpatialScale)**2
+        #                 n += 1.
+        #         tmp /= n
+        #         chi2.append(tmp)
+        #     if not any([c<=1 for c in chi2]) and \
+        #             (f['best']['x']**2+f['best']['y']**2>=self.rmin**2) and \
+        #             (f['best']['x']**2+f['best']['y']**2<=self.rmax**2):
+        #         allMin.append(f)
+        #         allMin[-1]['nsigma'] = _nSigmas(self.chi2_UD,  allMin[-1]['chi2'], self.ndata()-1)
+        #         try:
+        #             allMin[-1]['best']['f'] = np.abs(allMin[-1]['best']['f'])
+        #         except:
+        #             pass
+        # 
+        ### Alex
+        widgets=[progressbar.Bar(marker='='),' (', progressbar.AbsoluteETA(), ') ',]
+        bar = progressbar.ProgressBar(max_value=len(self.allFits), widgets=widgets)
         allMin = [self.allFits[0]]
-        allMin[0]['nsigma'] =  _nSigmas(self.chi2_UD,  allMin[0]['chi2'], self.ndata()-1)
-        for f in self.allFits:
+        allMin[0]['nsigma'] =  _nSigmas(self.chi2_UD,  allMin[0]['chi2'], self.ndata()-1)             
+        for i, f in enumerate(self.allFits):
+            bar.update(i+1)
             chi2 = []
-            for a in allMin:
-                tmp, n = 0., 0.
-                for k in ['x', 'y', 'f', 'diam']:
-                    if k in f['uncer'].keys() and k in a['uncer'].keys() and\
-                            f['uncer'][k]!=0 and a['uncer'][k]!=0:
-                        if k == 'f':
-                            tmp += (f['best'][k]-a['best'][k])**2/(0.01)**2
-                        elif k == 'diam':
-                            tmp += (f['best'][k]-a['best'][k])**2/(0.1*self.minSpatialScale)**2
-                        else: # -- for x and y
-                            tmp += (f['best'][k]-a['best'][k])**2/(0.5*self.minSpatialScale)**2
-                        n += 1.
-                tmp /= n
-                chi2.append(tmp)
-            if not any([c<=1 for c in chi2]) and \
-                    f['best']['x']**2+f['best']['y']**2>=self.rmin**2 and \
-                    f['best']['x']**2+f['best']['y']**2<=self.rmax**2:
-                allMin.append(f)
-                allMin[-1]['nsigma'] = _nSigmas(self.chi2_UD,  allMin[-1]['chi2'], self.ndata()-1)
-                try:
-                    allMin[-1]['best']['f'] = np.abs(allMin[-1]['best']['f'])
-                except:
-                    pass
+            if (f['best']['x']**2+f['best']['y']**2>=self.rmin**2) and \
+            (f['best']['x']**2+f['best']['y']**2<=self.rmax**2):
+                for a in allMin:
+                    tmp, n = 0., 0.
+                    for k in ['x', 'y', 'f', 'diam']:
+                        if k in f['uncer'].keys() and k in a['uncer'].keys() and\
+                                f['uncer'][k]!=0 and a['uncer'][k]!=0:
+                            if k == 'f':
+                                tmp += (f['best'][k]-a['best'][k])**2/(0.01)**2
+                            elif k == 'diam':
+                                tmp += (f['best'][k]-a['best'][k])**2/(0.1*self.minSpatialScale)**2
+                            else: # -- for x and y
+                                tmp += (f['best'][k]-a['best'][k])**2/(0.5*self.minSpatialScale)**2
+                            n += 1.
+                    tmp /= n
+                    chi2.append(tmp)
+                if not any([c<=1 for c in chi2]):
+                    allMin.append(f)
+                    allMin[-1]['nsigma'] = _nSigmas(self.chi2_UD,  allMin[-1]['chi2'], self.ndata()-1)
+                    try:
+                        allMin[-1]['best']['f'] = np.abs(allMin[-1]['best']['f'])
+                    except:
+                        pass
+            else:
+                pass
 
         if self.observables==['v2']:
             # -- symetric
@@ -2150,6 +2201,7 @@ class Open:
                 if d >0.1**2:
                     _allMin.append(tmp)
             allMin = allMin+_allMin
+
         result['internal']['all minima'] = allMin
 
         # -- is the grid to wide?
@@ -2221,12 +2273,18 @@ class Open:
                                         [x['best']['y'] for x in allMin],
                                         [np.log10(x['chi2']) for x in allMin],
                                         function='linear')
+            # _Z = scipy.interpolate.griddata(([x['best']['x'] for x in allMin], [x['best']['y'] for x in allMin]), [np.log10(x['chi2']) for x in allMin], (_X, _Y), method='linear')
+
         else:
             rbf = scipy.interpolate.Rbf([x['best']['x'] for x in allMin],
                                         [x['best']['y'] for x in allMin],
                                         [x['chi2'] for x in allMin],
                                         function='linear')
+            # _Z = scipy.interpolate.griddata(([x['best']['x'] for x in allMin], [x['best']['y'] for x in allMin]), [x['chi2'] for x in allMin], (_X, _Y), method='linear')
+        
         _Z = rbf(_X, _Y)
+        
+        self.interpolatedMap = {'X': _X, 'Y': _Y, 'N':int(np.ceil(2*self.rmax/step))}   ### ALEX
 
         # -- http://www.aanda.org/articles/aa/pdf/2011/11/aa17719-11.pdf section 3.2
         if chi2Scale=='log':
@@ -2234,13 +2292,17 @@ class Open:
             _Z[_X**2+_Y**2>self.rmax**2] = np.log10(self.chi2_UD)
             n_sigma = _nSigmas(self.chi2_UD, 10**_Z, self.ndata()-1)
             result['internal']['chi2 map'] = {'X':_X, 'Y':_Y, 'chi2':10**_Z}
+            self.interpolatedMap['chi2'] = _Z-np.log10(self.chi2_UD)   ### ALEX
         else:
             _Z[_X**2+_Y**2<self.rmin**2] = self.chi2_UD
             _Z[_X**2+_Y**2>self.rmax**2] = self.chi2_UD
             n_sigma = _nSigmas(self.chi2_UD, _Z, self.ndata()-1)
             result['internal']['nsigma map'] = {'X':_X, 'Y':_Y, 'chi2':n_sigma}
+            self.interpolatedMap['chi2'] = _Z/self.chi2_UD   ### ALEX
 
-        if not fig is None:
+        self.interpolatedMap['nsigma'] = n_sigma
+
+        if fig is not None:
             plt.close(fig)
             if CONFIG['suptitle']:
                 plt.figure(fig, figsize=(12/1.2,5.5/1.2))
@@ -2277,14 +2339,15 @@ class Open:
 
             plt.plot(0,0, '*y', ms=10) ### Alex
 
-            plt.colorbar(format='%0.2f')
-            if reliability=='unreliable':
-                plt.text(0,0,'!! UNRELIABLE !!', color='r', size=30, alpha=0.5,
-                         ha='center', va='center', rotation=45)
-                plt.text(self.rmax/3,self.rmax/3,'!! UNRELIABLE !!', color='r',
-                        size=30, alpha=0.5, ha='center', va='center', rotation=45)
-                plt.text(-self.rmax/3,-self.rmax/3,'!! UNRELIABLE !!', color='r',
-                        size=30, alpha=0.5, ha='center', va='center', rotation=45)
+            plt.colorbar(format='%0.2f', fraction=0.046, pad=0.04)
+            
+            # if reliability=='unreliable':   ### ALEX
+            #     plt.text(0,0,'!! UNRELIABLE !!', color='r', size=30, alpha=0.5,
+            #              ha='center', va='center', rotation=45)
+            #     plt.text(self.rmax/3,self.rmax/3,'!! UNRELIABLE !!', color='r',
+            #             size=30, alpha=0.5, ha='center', va='center', rotation=45)
+            #     plt.text(-self.rmax/3,-self.rmax/3,'!! UNRELIABLE !!', color='r',
+            #             size=30, alpha=0.5, ha='center', va='center', rotation=45)
             for i, f in enumerate(self.allFits):
                 plt.plot([f['best']['x'], f['init']['x']],
                          [f['best']['y'], f['init']['y']], '-y',
@@ -2310,17 +2373,17 @@ class Open:
             plt.pcolormesh(_X,#-dx,
                            _Y,#-dy,
                            n_sigma, cmap=CONFIG['color map'], vmin=0)
-            plt.colorbar(format='%0.2f')
+            plt.colorbar(format='%0.2f', fraction=0.046, pad=0.04)
             plt.plot(0,0, '*y', ms=10) ### Alex
             ax2.set_aspect('equal') ### Alex
 
-            if reliability=='unreliable':
-                plt.text(0,0,'!! UNRELIABLE !!', color='r', size=30, alpha=0.5,
-                         ha='center', va='center', rotation=45)
-                plt.text(self.rmax/2,self.rmax/2,'!! UNRELIABLE !!', color='r',
-                        size=30, alpha=0.5, ha='center', va='center', rotation=45)
-                plt.text(-self.rmax/2,-self.rmax/2,'!! UNRELIABLE !!', color='r',
-                        size=30, alpha=0.5, ha='center', va='center', rotation=45)
+            # if reliability=='unreliable':   ### ALEX
+            #     plt.text(0,0,'!! UNRELIABLE !!', color='r', size=30, alpha=0.5,
+            #              ha='center', va='center', rotation=45)
+            #     plt.text(self.rmax/2,self.rmax/2,'!! UNRELIABLE !!', color='r',
+            #             size=30, alpha=0.5, ha='center', va='center', rotation=45)
+            #     plt.text(-self.rmax/2,-self.rmax/2,'!! UNRELIABLE !!', color='r',
+            #             size=30, alpha=0.5, ha='center', va='center', rotation=45)
 
         # --
         nsmax = np.max([a['nsigma'] for a in allMin])
@@ -2335,33 +2398,37 @@ class Open:
         else:
             allMin2 = [allMin[i] for i in np.argsort([c['chi2'] for c in allMin])[nbDetect-1:nbDetect]]
 
+        self.interpolatedMap['allMin2'] = []
+
         for ii, i in enumerate(np.argsort([x['chi2'] for x in allMin2])):
-            if ii==0:
-                # -- best fit
-                result['result']['best fit'] = allMin2[i]
-                if '_k' in result['result']['best fit']['best']:
-                    result['result']['best fit']['best'].pop('_k')
-                    result['result']['best fit']['uncer'].pop('_k')
-                bestNsigma=allMin2[i]['nsigma']
 
             if np.abs(allMin2[i]['best']['f']) <=105.:  ### Alex
-                print(' | BEST FIT %d: chi2=%5.2f'%(ii, allMin2[i]['chi2']))
-                allMin2[i]['best']['f'] = np.abs(allMin2[i]['best']['f'] )
-                keys = list(allMin2[i]['best'].keys())
-                if '_k' in keys:
-                    keys.remove('_k')
 
-                for _k in keys:
-                    if _k.startswith('dwavel'):
-                        keys.remove(_k)
-                keys = sorted(keys)
+                if ii==0:
+                    # -- best fit
+                    result['result']['best fit'] = allMin2[i]
+                    if '_k' in result['result']['best fit']['best']:
+                        result['result']['best fit']['best'].pop('_k')
+                        result['result']['best fit']['uncer'].pop('_k')
+                    bestNsigma=allMin2[i]['nsigma']
 
-                for s in keys:
-                    if s in allMin2[i]['uncer'].keys() and allMin2[i]['uncer'][s]>0:
-                        print(' | %6s='%s, '%8.4f +- %6.4f [%s]'%(allMin2[i]['best'][s],
-                                                         allMin2[i]['uncer'][s], paramUnits(s)))
-                    else:
-                        print(' | %6s='%s, '%8.4f [%s]'%(allMin2[i]['best'][s], paramUnits(s)))
+                    print(' | BEST FIT %d: chi2=%5.2f'%(ii, allMin2[i]['chi2']))
+                    allMin2[i]['best']['f'] = np.abs(allMin2[i]['best']['f'] )
+                    keys = list(allMin2[i]['best'].keys())
+                    if '_k' in keys:
+                        keys.remove('_k')
+
+                    for _k in keys:
+                        if _k.startswith('dwavel'):
+                            keys.remove(_k)
+                    keys = sorted(keys)
+
+                    for s in keys:
+                        if s in allMin2[i]['uncer'].keys() and allMin2[i]['uncer'][s]>0:
+                            print(' | %6s='%s, '%8.4f +- %6.4f [%s]'%(allMin2[i]['best'][s],
+                                                             allMin2[i]['uncer'][s], paramUnits(s)))
+                        else:
+                            print(' | %6s='%s, '%8.4f [%s]'%(allMin2[i]['best'][s], paramUnits(s)))
                     
             # -- add sep and PA
             sep = np.sqrt(allMin2[i]['best']['x']**2 + allMin2[i]['best']['y']**2)
@@ -2379,6 +2446,8 @@ class Open:
             except:
                 print('cannot display correlation matrix')
 
+            self.interpolatedMap['allMin2'].append(allMin2[i])
+
             x0 = allMin2[i]['best']['x']
             ex0 = allMin2[i]['uncer']['x']
             y0 = allMin2[i]['best']['y']
@@ -2387,7 +2456,7 @@ class Open:
             ef0 = allMin2[i]['uncer']['f']
             s0 = allMin2[i]['nsigma']
 
-            if not fig is None:
+            if fig is not None:
                 try:   ### Alex
                     fs = max(int(12*s0/bestNsigma), 6)
                 except:
@@ -2408,7 +2477,7 @@ class Open:
                         va='bottom', ha='left', fontsize=fs)
 
 
-        if not fig is None:
+        if fig is not None:
             # plt.xlabel(r'E $\leftarrow\, \Delta \alpha$ (mas)')
             # plt.ylabel(r'$\Delta \delta\, \rightarrow$ N (mas)')
             plt.xlabel(r'$\Delta \alpha$ (mas)')            ### Alex
@@ -2426,7 +2495,7 @@ class Open:
             self.bestFit['best'].pop('_k')
         self.bestFit['nsigma'] = _nSigmas(self.chi2_UD,  self.bestFit['chi2'], self.ndata()-1)
         self.bestFit['reliability'] = reliability
-        if not fig is None:
+        if fig is not None:
             self.plotModel(fig=fig+1)
 
         # -- compare with injected companion, if any
@@ -2465,6 +2534,7 @@ class Open:
 
         self.history.append(result)
         return
+            
 
     def fitBoot(self, N=None, param=None, fig=2, fitAlso=None, doNotFit=[], useMJD=True,
                 monteCarlo=False, corrSpecCha=None, nSigmaClip=4.5, addCompanion=None,
@@ -2482,6 +2552,7 @@ class Open:
         - monteCarlo: uses a monte Carlo approches, rather than a statistical resampling:
             all data are considered but with random errors added. An additional dict can be added to describe
         """
+        
         result = {'call':{'method':'fitBoot'}, 'internal':{}, 'result':{}}
         if param is None:
             try:
@@ -2700,14 +2771,14 @@ class Open:
                                          np.percentile(d, 50),
                                          np.percentile(d, 84)))
 
-        w = np.where((x <= np.median(x) + nSigmaClip*(np.percentile(x, lims[1])-np.median(x)))*
+        w = np.where(( x <= np.median(x) + nSigmaClip*(np.percentile(x, lims[1])-np.median(x)) )*
                      (x >= np.median(x) - nSigmaClip*(np.median(x)-np.percentile(x, lims[0])))*
                      (y <= np.median(y) + nSigmaClip*(np.percentile(y, lims[1])-np.median(y)))*
                      (y >= np.median(y) - nSigmaClip*(np.median(y)-np.percentile(y, lims[0])))*
-                     (f <= np.median(f) + nSigmaClip*(np.percentile(f, lims[1])-np.median(f)))*
-                     (f >= np.median(f) - nSigmaClip*(np.median(f)-np.percentile(f, lims[0])))*
-                     (d <= np.median(d) + nSigmaClip*(np.percentile(d, lims[1])-np.median(d)))*
-                     (d >= np.median(d) - nSigmaClip*(np.median(d)-np.percentile(d, lims[0])))*
+                     (f <= np.median(f) + nSigmaClip*np.round(np.percentile(f, lims[1])-np.median(f),10))* ### Alex
+                     (f >= np.median(f) - nSigmaClip*np.round(np.median(f)-np.percentile(f, lims[0]),10))* ### Alex
+                     (d <= np.median(d) + nSigmaClip*np.round(np.percentile(d, lims[1])-np.median(d),10))* ### Alex
+                     (d >= np.median(d) - nSigmaClip*np.round(np.median(d)-np.percentile(d, lims[0]),10))* ### Alex
                      test
                     )
         flag = np.ones(len(self.allFits), dtype=bool)
@@ -2908,6 +2979,10 @@ class Open:
                                     and c[0].split(';')[1] in self.instruments,
                                 self._chi2Data)), param)
         #print(_meas.shape)
+        ### Alex
+        blue = u'#4169e1'
+        red = u'#d62728'
+        
         plt.close(fig)
         plt.figure(fig, figsize=(7,7))
         plt.clf()
@@ -2940,28 +3015,35 @@ class Open:
                 res = np.float_(res)
                 _measw = np.angle(_meas[w]).real
                 _modw = np.angle(_mod[w]).real
-                plt.plot(X, 180/np.pi*(np.mod(_modw+np.pi/2, np.pi)-np.pi/2)+oCP*offset,
-                        '.k', alpha=0.4)
-                plt.scatter(X, 180/np.pi*(np.mod(_measw+np.pi/2,np.pi)-np.pi/2)+oCP*offset,
-                            c=_wl[w], marker=marker, cmap='hot_r',
-                            alpha=0.5, linestyle=linestyle)
+                # plt.scatter(X, 180/np.pi*(np.mod(_measw+np.pi/2,np.pi)-np.pi/2)+oCP*offset,
+                #             c=_wl[w], marker=marker, cmap='hot_r',
+                #             alpha=0.5, linestyle=linestyle)
                 plt.errorbar(X, 180/np.pi*(np.mod(_measw+np.pi/2, np.pi)-np.pi/2) +oCP*offset,
-                            fmt=',', yerr=180/np.pi*_errs[w], marker=None, color='k', alpha=0.2)
+                            fmt='o', yerr=180/np.pi*_errs[w],# marker=None,
+                            color=blue, alpha=1., zorder=1)
+                plt.plot(X, 180/np.pi*(np.mod(_modw+np.pi/2, np.pi)-np.pi/2)+oCP*offset,
+                        '.', color=red, alpha=1., zorder=2)
                 plt.ylabel(t.split(';')[0]+r': deg, mod 180')
             else:
+                if t.split(';')[0]=='cp': ### Alex
+                    _meas[w] = _meas[w]*180./np.pi
+                    _errs[w] = _errs[w]*180./np.pi
                 res = (_meas[w]-_mod[w])/_errs[w]
-                plt.errorbar(X, _meas[w]+oV2*offset, fmt=',', yerr=_errs[w], marker=None,
-                             color='k', alpha=0.2)
-                plt.scatter(X, _meas[w]+oV2*offset, c=_wl[w], marker=marker, cmap='hot_r',
-                        alpha=0.5, linestyle=linestyle)
-                plt.plot(X, _mod[w]+oV2*offset, '.k', alpha=0.4)
-                plt.ylabel(t.split(';')[0])
+                plt.errorbar(X, _meas[w]+oV2*offset, fmt='o', yerr=_errs[w],# marker=None,
+                             color=blue, alpha=1., zorder=1)
+                # plt.scatter(X, _meas[w]+oV2*offset, c=_wl[w], marker=marker, cmap='hot_r',
+                #         alpha=0.5, linestyle=linestyle)
+                plt.plot(X, _mod[w]+oV2*offset, 'o', color=red, alpha=1., zorder=2)
+                if t.split(';')[0]=='cp': ### Alex
+                    plt.ylabel('cp (deg)')
+                else:
+                    plt.ylabel(t.split(';')[0])
                 if t.split(';')[0]=='v2':
                     plt.ylim(-0.1, 1.1+np.max(offset)*oV2)
 
             # -- residuals
             plt.subplot(2,N,i+1+N, sharex=ax1)
-            plt.plot(X, res, '.k', alpha=0.5)
+            plt.plot(X, res, 'o', color=blue, alpha=1.)
             if spectral:
                 plt.xlabel('wavelength')
             else:
@@ -3139,6 +3221,7 @@ class Open:
     def detectionLimit(self, step=None, diam=None, fig=4, addCompanion=None,
                         removeCompanion=None, drawMaps=True, rmin=None, rmax=None,
                         methods = ['Absil', 'Gallenne'], fratio=1., n_Sigma=3, fullMap=0):   ### Alex
+        
         """
         step: number of steps N in the map (map will be NxN)
         drawMaps: display the detection maps in addition to the radial profile (default)
@@ -3426,6 +3509,168 @@ class Open:
 
 
         hdu.writeto(outfile, overwrite=True)
+
+    def plotMaps(self, fig=37, param=None, plotUV=0, data=None):   ### Alex
+        '''
+        Parameters taken from the previous fit to plot the chi2 map.
+        '''
+        if data is not None:
+            self = data 
+        
+        # if param is not None:
+        #     _X = param['X']
+        #     _Y = param['Y']
+        #     _Z = param['chi2']
+        #     n_sigma = param['nsigma']
+        #     N = param['N']
+        #     allMin2 = param['allMin2']
+        #     # allFits = param['allFits']
+        # else:
+        
+        _X = self.interpolatedMap['X']
+        _Y = self.interpolatedMap['Y']
+        _Z = self.interpolatedMap['chi2']
+        n_sigma = self.interpolatedMap['nsigma']
+        N = self.interpolatedMap['N']
+        allMin2 = self.interpolatedMap['allMin2']
+            
+        plt.close(fig)
+        if plotUV:
+            N=3
+            plt.figure(fig, figsize=(12.5,3.5))
+        else:
+            N=2
+            plt.figure(fig, figsize=(10.,4))
+            
+        # if CONFIG['suptitle']:
+        #     plt.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.78,
+        #                         wspace=0.2, hspace=0.2)
+        # else:
+        #     plt.figure(fig, figsize=(12/1.2,5./1.2))
+        #     plt.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.9,
+        #                         wspace=0.2, hspace=0.2)
+
+        title = "CANDID: companion search"
+        title += ' using '+', '.join(self.observables)
+        title += '\nfrom '+', '.join(self.instruments)
+        title += '\n'+self.titleFilename
+        # if not removeCompanion is None:
+        #     title += '\ncompanion removed at X=%3.2fmas, Y=%3.2fmas, F=%3.2f%%'%(
+        #             removeCompanion['x'], removeCompanion['y'], removeCompanion['f'])
+        if CONFIG['suptitle']:
+            plt.suptitle(title, fontsize=10, fontweight='bold')
+
+        if plotUV:
+            N=3
+        else:
+            N=2
+
+        ax1 = plt.subplot(1,N,1)
+        if CONFIG['chi2 scale'] =='log':
+            if CONFIG['suptitle']:   ### Alex
+                plt.title('log10[$\chi^2$ best fit / $\chi^2_{UD}$]')
+            plt.pcolormesh(_X,#-dx,
+                           _Y,#-dy,
+                           _Z, cmap=CONFIG['color map']+'_r')
+        else:
+            if CONFIG['suptitle']:   ### Alex
+                plt.title('$\chi^2$ best fit / $\chi^2_{UD}$')
+            plt.pcolormesh(_X,#-dx,
+                           _Y,#-dy,
+                           _Z, cmap=CONFIG['color map']+'_r')
+
+        plt.plot(0,0, '*y', ms=10) ### Alex
+
+        plt.colorbar(format='%0.2f', fraction=0.046, pad=0.04)
+        for i, f in enumerate(self.allFits):
+            plt.plot([f['best']['x'], f['init']['x']],
+                     [f['best']['y'], f['init']['y']], '-y',
+                     alpha=0.3, linewidth=2)
+        plt.xlabel(r'$\Delta \alpha$ (mas)')                    ### Alex
+        plt.ylabel(r'$\Delta \delta$ (mas)')                    ### Alex
+
+        plt.xlim(self.rmax-0.5*self.rmax/float(N), -self.rmax+0.5*self.rmax/float(N))
+        plt.ylim(-self.rmax+0.5*self.rmax/float(N), self.rmax-0.5*self.rmax/float(N))
+        ax1.set_aspect('equal',)# 'datalim')
+
+        ax2 = plt.subplot(1,N,2, sharex=ax1, sharey=ax1)
+        if CONFIG['suptitle']:   ### Alex
+            plt.title('n$\sigma$ of detection')
+        
+        plt.pcolormesh(_X,#-dx,
+                       _Y,#-dy,
+                       n_sigma, cmap=CONFIG['color map'], vmin=0)
+        plt.colorbar(format='%0.2f', fraction=0.046, pad=0.04)
+        plt.plot(0,0, '*y', ms=10) ### Alex
+        ax2.set_aspect('equal') ### Alex
+        plt.xlabel(r'$\Delta \alpha$ (mas)')                    ### Alex
+        plt.ylabel(r'$\Delta \delta$ (mas)')                    ### Alex
+                
+        for allMin in allMin2:
+            x0 = allMin['best']['x']
+            ex0 = allMin['uncer']['x']
+            y0 = allMin['best']['y']
+            ey0 = allMin['uncer']['y']
+            f0 = np.abs(allMin['best']['f'])
+            ef0 = allMin['uncer']['f']
+            s0 = allMin['nsigma']
+
+            if fig is not None:
+                try:   ### Alex
+                    fs = max(int(12*s0/bestNsigma), 6)
+                except:
+                    fs = 12
+                # -- draw cross hair
+                for ax in [ax1, ax2]:
+                    ax.plot([x0, x0], [y0-0.05*self.rmax, y0-0.1*self.rmax], '-r',
+                            alpha=fs/12, linewidth=fs/4)
+                    ax.plot([x0, x0], [y0+0.05*self.rmax, y0+0.1*self.rmax], '-r',
+                            alpha=fs/12, linewidth=fs/4)
+                    ax.plot([x0-0.05*self.rmax, x0-0.1*self.rmax], [y0, y0], '-r',
+                            alpha=fs/12, linewidth=fs/4)
+                    ax.plot([x0+0.05*self.rmax, x0+0.1*self.rmax], [y0, y0], '-r',
+                            alpha=fs/12, linewidth=fs/4)
+                # ax1.text(x0, y0, r'%.2e'%(allMin[i]['chi2']/self.chi2_UD), color='r',
+                #         va='bottom', ha='left', fontsize=fs)
+                ax2.text(x0, y0, r'%3.1f$\sigma$'%s0, color='r',
+                        va='bottom', ha='left', fontsize=fs)
+        
+        
+        ### UV plot ###
+        # u, v, wl = np.array([]), np.array([]), np.array([])        
+        # if plotUV:
+        #     for obs in self._rawData:
+        #         if obs[0].split(';')[0] == 'v2':
+        #             u = np.append(u, obs[1])
+        #             v = np.append(v, obs[2])
+        #             wl = np.append(wl, obs[3])
+        #             wl0 = obs[3][0]
+        #             sp_chan = len(obs[3][0])
+        # 
+        #     if sp_chan<50:
+        #         pass
+        #     elif sp_chan<500:
+        #         wl = np.linspace(np.min(wl0), np.max(wl0), 25)
+        #     elif sp_chan<5000:
+        #         sp_chan = np.linspace(np.min(wl0), np.max(wl0), 50)
+        # 
+        #     if sp_chan>1:
+        #         colors = cm.bwr(np.linspace(0, 1, sp_chan))
+        #         # colors = cm.jet_r(np.linspace(0, 1, len(sp_chan)))
+        #     else:
+        #         colors = [self.colb]
+        # 
+        #     ax3 = plt.subplot(1,N,3)
+        #     for u_,v_,wl_ in zip(u,v,wl):   
+        #         print(u_)
+        #         print(wl_)         
+        #         ax3.plot(u_/wl_, v_/wl_, 'o', color=colors, mew=0, ms=5)
+        #         # ax3.plot(-u/wl, -v/wl, 'o', color=colors, mew=0, ms=5)
+        # 
+        #     plt.xlabel('U (M$\lambda$)')
+        #     plt.ylabel('V (M$\lambda$)')
+        #     plt.grid(lw=.2)
+            
 
 def sliding_percentile(x, y, dx, percentile=50, smooth=True):
     res = np.zeros(len(y))

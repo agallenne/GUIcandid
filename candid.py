@@ -78,7 +78,7 @@ import matplotlib.cm as cm
 # __version__ = '0.3.1 | 2018/04/04' # Alex changes
 #__version__ = '1.0 | 2018/11/08'  # Converted to Python3
 #__version__ = '1.0.1 | 2019/01/18'# implement curve_fit to include correlated errors
-__version__ = '1.0.2 | 2019/03/01' # many tweaks in the plots; x>0 fit only for only v2; implement history
+#__version__ = '1.0.2 | 2019/03/01' # many tweaks in the plots; x>0 fit only for only v2; implement history
 __version__ = '1.0.3 | 2021/06/16' # many new features added: saving the nsigma mam in a fits file, error ellise from the bootstrap are provided,
                                    # possibility to plot more than 1 best detection, possibility to select a wavelength range (not in GUI yet)
                                    # 

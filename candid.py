@@ -78,7 +78,10 @@ import matplotlib.cm as cm
 # __version__ = '0.3.1 | 2018/04/04' # Alex changes
 #__version__ = '1.0 | 2018/11/08'  # Converted to Python3
 #__version__ = '1.0.1 | 2019/01/18'# implement curve_fit to include correlated errors
-__version__ = '1.0.2 | 2019/03/01'# many tweaks in the plots; x>0 fit only for only v2; implement history
+__version__ = '1.0.2 | 2019/03/01' # many tweaks in the plots; x>0 fit only for only v2; implement history
+__version__ = '1.0.3 | 2021/06/16' # many new features added: saving the nsigma mam in a fits file, error ellise from the bootstrap are provided,
+                                   # possibility to plot more than 1 best detection, possibility to select a wavelength range (not in GUI yet)
+                                   # 
 
 
 print("""
@@ -1151,6 +1154,10 @@ class Open:
 
         # -- keep track of what is done
         self.history = []
+        
+        # ### Alex
+        # self.orbel = {}
+        # self.wlRange = []
 
     def setLDcoefAlpha(self, alpha):
         """
@@ -1230,8 +1237,12 @@ class Open:
         self.diffFov = 5e3 # diffraction FoV, in mas
         self.minSpatialScale = 5e3
         self._delta = []
-        self.baselines = {}   ### Alex
+        ### Alex
+        self.baselines = {}
+        self.orbel = {}
+        self.wlRange = []
         return
+    
     def _copyRawData(self):
         """
         create a copy of the raw data
@@ -1607,8 +1618,9 @@ class Open:
                 _dwavel = np.append(_dwavel, np.ones(c[-2].shape).flatten()*
                                         self.dwavel[c[0].split(';')[1]])
         res = (_uv*self.rmax/(_wl-0.5*_dwavel)-_uv*self.rmax/(_wl+0.5*_dwavel))*0.004848136
-        #print('DEBUG:', res)
-        CONFIG['Nsmear'] = max(int(np.ceil(4*res.max())), 3)
+        # print('DEBUG:', res)
+        # CONFIG['Nsmear'] = max(int(np.ceil(4*res.max())), 3)
+        CONFIG['Nsmear'] = max(int(np.ceil(4*np.nanmax(res))), 3) ### Alex
         print(' | setting up Nsmear = %d'%CONFIG['Nsmear'])
         return
 
@@ -1906,6 +1918,17 @@ class Open:
         - nbDetect: Choose the number of detected features to plot on the map:  ### Alex
                     - nbDetect = 3: will plot the third best minimum            ### Alex
                     - nbDetect = [3]: will plot all the minimum til the third   ### Alex
+        - For known spectroscopic binaries, some orbital parameters (Porb, ecc, MT and distance) can be given
+            before to set the maximum search radius. It is recommended to set the total mass with +1.0Msun and
+            the distance with -50pc to insure:
+                    - c.orbel = {'Porb': 1000, # Orbital period in days
+                                 'ecc': 0.5,   # Eccentricity
+                                  'MT': 10.,   # Total mass of the system, i.e. MT = M1 + M2 in Msun
+                                  'dist': 500  # Distance to the system in pc
+                                 }
+            The maximum allowed separation is then given by:
+                    - rmax = amax*(1 + ecc)
+                    - amax = (MT*(Porb/365.25)**2)**(1./3)/dist  # in arcsec
         """
         result = {'call':{'method':'fitMap'},
                   'internal':{},
@@ -1924,9 +1947,20 @@ class Open:
 
         if rmax is None:
             self.rmax = 1.2*self.smearFov
-            print(" | rmax= not given, set to 1.2*Field of View (bandwidth smearing): rmax=%5.2f mas"%(self.rmax))
+            if not self.orbel.keys(): ### Alex
+                print(" | rmax= not given, set to 1.2*Field of View (bandwidth smearing): rmax=%5.2f mas"%(self.rmax))
         else:
             self.rmax = rmax
+        
+        ###ALEX
+        if self.orbel.keys():
+            amax = (self.orbel['MT']*(self.orbel['Porb']/365.25)**2)**(1./3)/self.orbel['dist']*1000. 
+            rmax = amax*(1 + self.orbel['ecc'])
+            self.rmax = rmax
+            print(' | \033[92mrmax set to %5.2f mas according the given orbital parameters: \033[0m'%(self.rmax))
+            print(' | \033[92m ',self.orbel,'\033[0m')
+        
+        
         result['call']['rmax']=self.rmax
 
         result['call']['fratio']=fratio if 'f' not in doNotFit.keys() else doNotFit['f']   ### Alex
@@ -1951,6 +1985,25 @@ class Open:
 
         # -- start with all data
         self._chi2Data = self._copyRawData()
+        
+        ### Selecting wavelength range ### Alex
+        np.seterr(invalid='ignore')
+        if self.wlRange:
+            for k, data_1 in enumerate(self._chi2Data): 
+                for kk, data_2 in enumerate(self._chi2Data[k]): 
+                    if self._chi2Data[k][0][:2]=='v2': 
+                        if kk==0: 
+                            pass 
+                        else: 
+                            self._chi2Data[k][kk] = np.where((self._chi2Data[k][3]<self.wlRange[1])*(self._chi2Data[k][3]>self.wlRange[0]), self._chi2Data[k][kk], np.nan)
+                    if self._chi2Data[k][0][:2] in ['t3','cp']: 
+                        if kk==0: 
+                            pass 
+                        else: 
+                            self._chi2Data[k][kk] = np.where((self._chi2Data[k][5]<self.wlRange[1])*(self._chi2Data[k][5]>self.wlRange[0]), self._chi2Data[k][kk], np.nan)
+        else:
+            self._chi2Data = self._copyRawData()
+                            
 
         if not removeCompanion is None:
             tmp = {k:removeCompanion[k] for k in removeCompanion.keys()}

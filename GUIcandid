@@ -2,11 +2,10 @@
 
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'untitled.ui'
+# Created by Alexandre Gallenne
+#       alexandre.gallenne@gmail.com 
 #
-# Created by: PyQt5 UI code generator 5.9.2
-#
-# WARNING! All changes made in this file will be lost!
+
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 import multiprocessing
@@ -138,12 +137,22 @@ class Ui_MainWindow(object):
         self.label_Instrument.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
         self.label_Instrument.setObjectName("label_Instrument")
         self.comboBox_Instrument = QtWidgets.QComboBox(self.centralwidget)
-        self.comboBox_Instrument.setGeometry(QtCore.QRect(94, 142, 145, 26))
+        self.comboBox_Instrument.setGeometry(QtCore.QRect(94, 142, 110, 26))
         self.comboBox_Instrument.setObjectName("comboBox_Instrument")
         self.comboBox_Instrument.addItem('All')
         self.comboBox_Instrument.currentIndexChanged.connect(self.selectInstrument)
         self.comboBox_Instrument.setToolTip('Select the instrument (if several) to be used to search for a companion')
-
+        
+        self.label_WLRange = QtWidgets.QLabel(self.centralwidget)
+        self.label_WLRange.setGeometry(QtCore.QRect(225, 145, 70, 16))
+        self.label_WLRange.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_WLRange.setObjectName("label_WLRange")
+        self.lineEdit_WLRange = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_WLRange.setGeometry(QtCore.QRect(290, 143, 75, 23))
+        self.lineEdit_WLRange.setObjectName("lineEdit_WLRange")
+        self.lineEdit_WLRange.setText('Full')
+        self.lineEdit_WLRange.returnPressed.connect(self.changeWLRange)
+        self.lineEdit_WLRange.setToolTip('Select the wavelength range: lambda_min,lambda_max')
         ######################
         ##### PARAMETERS #####
         ######################
@@ -166,9 +175,10 @@ class Ui_MainWindow(object):
         self.checkBox_CP.setGeometry(QtCore.QRect(18, 213, 43, 20))
         self.checkBox_CP.setAccessibleName("")
         self.checkBox_CP.setObjectName("checkBox_CP")
-        self.checkBox_CP.setChecked(True)
+        self.checkBox_CP.setChecked(False)
         self.checkBox_CP.stateChanged.connect(self.selectObservables)
         self.checkBox_CP.setToolTip('Check to include CPs in the fit map')
+        self.checkBox_CP.stateChanged.connect(self.selectCPmode)
 
         self.checkBox_V2 = QtWidgets.QCheckBox(self.centralwidget)
         self.checkBox_V2.setEnabled(True)
@@ -187,6 +197,17 @@ class Ui_MainWindow(object):
         self.checkBox_T3amp.setChecked(True)
         self.checkBox_T3amp.stateChanged.connect(self.selectObservables)
         self.checkBox_T3amp.setToolTip('Check to include T3amps in the fit')
+
+        self.checkBox_iCP = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_iCP.setEnabled(True)
+        self.checkBox_iCP.setGeometry(QtCore.QRect(218, 213, 68, 20))
+        self.checkBox_iCP.setAccessibleName("")
+        self.checkBox_iCP.setObjectName("checkBox_iCP")
+        self.checkBox_iCP.setChecked(True)
+        self.cpMode = 'iCP'
+        self.checkBox_iCP.stateChanged.connect(self.selectObservables)
+        self.checkBox_iCP.setToolTip('Check to use iCP instead of CP in the fit')
+        self.checkBox_iCP.stateChanged.connect(self.selectiCPmode)
 
         self.doNotFit = {}
         self.addParam = {}
@@ -555,10 +576,12 @@ class Ui_MainWindow(object):
         self.checkBox_Title.setText(_translate("MainWindow", "Titles"))
         self.label_ExecTime.setText(_translate("MainWindow", "Exec. Time(s):"))
         self.label_Instrument.setText(_translate("MainWindow", "Instrument:"))
+        self.label_WLRange.setText(_translate("MainWindow", "WL range:"))
         self.label_Parameters.setText(_translate("MainWindow", "Fitted Parameters"))
         self.checkBox_CP.setText(_translate("MainWindow", "CP"))
         self.checkBox_V2.setText(_translate("MainWindow", "V2"))
         self.checkBox_T3amp.setText(_translate("MainWindow", "T3amp"))
+        self.checkBox_iCP.setText(_translate("MainWindow", "iCP"))
         self.checkBox_Diam1.setText(_translate("MainWindow", "diam1:"))
         self.checkBox_Alpha.setText(_translate("MainWindow", "alpha:"))
         self.checkBox_Diam2.setText(_translate("MainWindow", "diam2:"))
@@ -598,6 +621,37 @@ class Ui_MainWindow(object):
         self.label_PaperLink.setText(_translate("MainWindow", urlLink))
         self.checkBox_MCBootstrap.setText(_translate("MainWindow", "MC"))
 
+    def changeWLRange(self):
+        wlrange = self.lineEdit_WLRange.text()
+        if wlrange=='Full':
+            self.candid.wlRange = []
+        else:
+            try:
+                wlrange = wlrange.split(',')
+                self.candid.wlRange = [float(wlrange[0]), float(wlrange[1])]
+            except:
+                self.candid.wlRange = []
+
+    def selectCPmode(self):
+        if self.checkBox_CP.isChecked():
+            self.cpMode = False
+            self.openOI()
+            self.checkBox_iCP.setChecked(False)
+            # self.checkBox_iCP.setEnabled(False)
+            # self.checkBox_CP.setEnabled(True)
+        else:
+            pass
+
+    def selectiCPmode(self):
+        if self.checkBox_iCP.isChecked():
+            self.cpMode = 'iCP'
+            self.openOI()
+            self.checkBox_CP.setChecked(False)
+            # self.checkBox_iCP.setEnabled(False)
+            # self.checkBox_CP.setEnabled(True)
+        else:
+            pass      
+            
     def saveFits(self):
         
         outfile = self.lineEdit_NSigmaDetectionMap.text()+'sigma_detection_limit_map.fits'
@@ -897,7 +951,17 @@ class Ui_MainWindow(object):
                     self.candid.observables.append('t3')
         except:
             pass
+        try:
+            if not self.checkBox_iCP.isChecked():
+                self.candid.observables.remove('icp')
+            else:
+                if 'icp' not in self.candid.observables:
+                    self.candid.observables.append('icp')
+        except:
+            pass
         
+        print('\n  --> Selected observables:',self.candid.observables)
+
     def openOI(self):
         files, _ = QtWidgets.QFileDialog.getOpenFileNames(self.centralwidget,"Select OI data", "","Text Files (*.fits *.oifits);;All Files (*)")#,
         self.tmp = 0
@@ -905,7 +969,7 @@ class Ui_MainWindow(object):
             pass
         else:
             self.comboBox_Instrument.clear()
-            self.candid = candid.Open(files)
+            self.candid = candid.Open(files, largeCP=self.cpMode)
             if len(self.candid.instruments)>1:
                 self.comboBox_Instrument.addItem('All')
                 self.comboBox_Instrument.addItems(self.candid.instruments)

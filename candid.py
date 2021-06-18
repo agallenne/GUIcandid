@@ -28,7 +28,6 @@ except:
 
 import random
 
-
 # -- defunct ;(
 #from scipy import weave
 #from scipy.weave import converters
@@ -46,6 +45,7 @@ from matplotlib.ticker import MultipleLocator ### Alex
 import progressbar
 import matplotlib.cm as cm
 
+import pandas as pd ### Alex 
 
 #__version__ = '0.1 | 2014/11/25'
 #__version__ = '0.2 | 2015/01/07'  # big clean
@@ -1985,26 +1985,40 @@ class Open:
         result['internal']['instruments']=self.instruments
 
         # -- start with all data
-        self._chi2Data = self._copyRawData()
+        # self._chi2Data = self._copyRawData()
         
         ### Selecting wavelength range ### Alex
+        print(self.wlRange)
         np.seterr(invalid='ignore')
         if self.wlRange:
-            for k, data_1 in enumerate(self._chi2Data): 
-                for kk, data_2 in enumerate(self._chi2Data[k]): 
-                    if self._chi2Data[k][0][:2]=='v2': 
+            self._chi2Data = []
+            for k, data_1 in enumerate(self._rawData): 
+                for kk, data_2 in enumerate(self._rawData[k]): 
+                    if self._rawData[k][0][:2]=='v2': 
                         if kk==0: 
-                            pass 
+                            self._chi2Data.append([self._rawData[k][0]]) 
                         else: 
-                            self._chi2Data[k][kk] = np.where((self._chi2Data[k][3]<self.wlRange[1])*(self._chi2Data[k][3]>self.wlRange[0]), self._chi2Data[k][kk], np.nan)
-                    if self._chi2Data[k][0][:2] in ['t3','cp']: 
+                            tmp_ = pd.DataFrame(self._rawData[k][kk]).fillna(np.inf).to_numpy()
+                            tmp = np.where((self._rawData[k][3]<self.wlRange[1])*(self._rawData[k][3]>self.wlRange[0]), tmp_, np.nan)
+                            tmp = pd.DataFrame(tmp)
+                            tmp = tmp.dropna(axis=1)
+                            tmp = tmp.replace([np.inf,-np.inf], np.nan)
+                            # print(tmp)
+                            self._chi2Data[k].append(tmp.to_numpy())
+                    if self._rawData[k][0][:2] in ['t3','cp','ic']: 
                         if kk==0: 
-                            pass 
+                            self._chi2Data.append([self._rawData[k][0]])  
                         else: 
-                            self._chi2Data[k][kk] = np.where((self._chi2Data[k][5]<self.wlRange[1])*(self._chi2Data[k][5]>self.wlRange[0]), self._chi2Data[k][kk], np.nan)
+                            tmp_ = pd.DataFrame(self._rawData[k][kk]).fillna(np.inf).to_numpy()
+                            tmp = np.where((self._rawData[k][5]<self.wlRange[1])*(self._rawData[k][5]>self.wlRange[0]), tmp_, np.nan)
+                            tmp = pd.DataFrame(tmp)
+                            tmp = tmp.dropna(axis=1)
+                            tmp = tmp.replace([np.inf,-np.inf], np.nan)
+                            # print(tmp)
+                            self._chi2Data[k].append(tmp.to_numpy())
         else:
             self._chi2Data = self._copyRawData()
-                            
+        
 
         if not removeCompanion is None:
             tmp = {k:removeCompanion[k] for k in removeCompanion.keys()}
@@ -2632,8 +2646,39 @@ class Open:
 
         result['call']['N'] = N
 
-        self._chi2Data = self._copyRawData()
+        # self._chi2Data = self._copyRawData()
 
+        ### Selecting wavelength range ### Alex
+        np.seterr(invalid='ignore')
+        if self.wlRange:
+            self._chi2Data = []
+            for k, data_1 in enumerate(self._rawData): 
+                for kk, data_2 in enumerate(self._rawData[k]): 
+                    if self._rawData[k][0][:2]=='v2': 
+                        if kk==0: 
+                            self._chi2Data.append([self._rawData[k][0]]) 
+                        else: 
+                            tmp_ = pd.DataFrame(self._rawData[k][kk]).fillna(np.inf).to_numpy()
+                            tmp = np.where((self._rawData[k][3]<self.wlRange[1])*(self._rawData[k][3]>self.wlRange[0]), tmp_, np.nan)
+                            tmp = pd.DataFrame(tmp)
+                            tmp = tmp.dropna(axis=1)
+                            tmp = tmp.replace([np.inf,-np.inf], np.nan)
+                            # print(tmp)
+                            self._chi2Data[k].append(tmp.to_numpy())
+                    if self._rawData[k][0][:2] in ['t3','cp','ic']: 
+                        if kk==0: 
+                            self._chi2Data.append([self._rawData[k][0]])  
+                        else: 
+                            tmp_ = pd.DataFrame(self._rawData[k][kk]).fillna(np.inf).to_numpy()
+                            tmp = np.where((self._rawData[k][5]<self.wlRange[1])*(self._rawData[k][5]>self.wlRange[0]), tmp_, np.nan)
+                            tmp = pd.DataFrame(tmp)
+                            tmp = tmp.dropna(axis=1)
+                            tmp = tmp.replace([np.inf,-np.inf], np.nan)
+                            # print(tmp)
+                            self._chi2Data[k].append(tmp.to_numpy())
+        else:
+            self._chi2Data = self._copyRawData()
+            
         if not addCompanion is None:
             tmp = {k:addCompanion[k] for k in addCompanion.keys()}
             tmp['f'] = np.abs(tmp['f'])
@@ -2697,7 +2742,8 @@ class Open:
         result['internal']['fit all data'] = refFit
 
         res = {'fit':refFit}
-        res['MJD'] = self.allMJD.mean()
+        # res['MJD'] = self.allMJD.mean()
+        res['MJD'] = np.nanmean(self.allMJD) ### Alex
         p = self._pool()
 
         mjds = []
@@ -2709,7 +2755,7 @@ class Open:
             useMJD=False
         if useMJD:
             print(' | Boostrapping on %d MJDs: %.5f => %.5f'%(len(mjds),
-                    min(mjds), max(mjds)))
+                    np.nanmin(mjds), np.nanmax(mjds)))
 
         result['call']['useMJD'] = useMJD
         result['internal']['all MJD'] = mjds
@@ -3316,7 +3362,39 @@ class Open:
         print(' | instruments:', self.instruments, 'from', self.ALLinstruments)
 
         # -- start with all data
-        self._chi2Data = self._copyRawData()
+        # self._chi2Data = self._copyRawData()
+
+        ### Selecting wavelength range ### Alex
+        np.seterr(invalid='ignore')
+        if self.wlRange:
+            self._chi2Data = []
+            for k, data_1 in enumerate(self._rawData): 
+                for kk, data_2 in enumerate(self._rawData[k]): 
+                    if self._rawData[k][0][:2]=='v2': 
+                        if kk==0: 
+                            self._chi2Data.append([self._rawData[k][0]]) 
+                        else: 
+                            tmp_ = pd.DataFrame(self._rawData[k][kk]).fillna(np.inf).to_numpy()
+                            tmp = np.where((self._rawData[k][3]<self.wlRange[1])*(self._rawData[k][3]>self.wlRange[0]), tmp_, np.nan)
+                            tmp = pd.DataFrame(tmp)
+                            tmp = tmp.dropna(axis=1)
+                            tmp = tmp.replace([np.inf,-np.inf], np.nan)
+                            # print(tmp)
+                            self._chi2Data[k].append(tmp.to_numpy())
+                    if self._rawData[k][0][:2] in ['t3','cp','ic']: 
+                        if kk==0: 
+                            self._chi2Data.append([self._rawData[k][0]])  
+                        else: 
+                            tmp_ = pd.DataFrame(self._rawData[k][kk]).fillna(np.inf).to_numpy()
+                            tmp = np.where((self._rawData[k][5]<self.wlRange[1])*(self._rawData[k][5]>self.wlRange[0]), tmp_, np.nan)
+                            tmp = pd.DataFrame(tmp)
+                            tmp = tmp.dropna(axis=1)
+                            tmp = tmp.replace([np.inf,-np.inf], np.nan)
+                            # print(tmp)
+                            self._chi2Data[k].append(tmp.to_numpy())
+        else:
+            self._chi2Data = self._copyRawData()
+
         if not addCompanion is None:
             tmp = {k:addCompanion[k] for k in addCompanion.keys()}
             tmp['f'] = np.abs(tmp['f'])

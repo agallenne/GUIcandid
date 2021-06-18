@@ -14,4 +14,4 @@ The GUI will open. Tool tips are available with some explanations of each functi
 
 Note: Only tested on MacOS 10.15.6 with Python 3.7.4
 
-![GUI](figure1.png)
+![GUI](figure.png)

@@ -42,7 +42,7 @@ from astropy import wcs ### Alex
 import matplotlib.ticker as mtick ### Alex
 from matplotlib.ticker import MultipleLocator ### Alex
 
-import progressbar
+# import progressbar
 import matplotlib.cm as cm
 
 import pandas as pd ### Alex 
@@ -59,7 +59,7 @@ import pandas as pd ### Alex
 #__version__ = '0.10 | 2015/08/14' # adding LD coef and coding CP in iCP
 #__version__ = '0.11 | 2015/09/03' # changing detection limits to 99% and Mag instead of %
 #__version__ = '0.12 | 2015/09/17' # takes list of files; bestFit cannot be out rmin/rmax
-#__version__ = '0.13 | 2015/09/30' # fixed some bugs in list on minima for fitMap
+#__version__ = '0.13 | 2015/09/30' # fixed some bugs in list on minima for 
 #__version__ = '0.14 | 2015/09/30' # fixed some BIG bugs in fixed diameter option
 #__version__ = '0.15 | 2015/10/02' # np.nanmean instead of np.mean in _chi2func
 #__version__ = '0.16 | 2015/10/22' # weave to accelerate the binary visibility!
@@ -1885,7 +1885,7 @@ class Open:
 
     def _cb_fitFunc(self, r):
         """
-        callback function for fitMap
+        callback function for 
         """
         # try:
         if '_k' in r.keys():
@@ -1988,7 +1988,6 @@ class Open:
         # self._chi2Data = self._copyRawData()
         
         ### Selecting wavelength range ### Alex
-        print(self.wlRange)
         np.seterr(invalid='ignore')
         if self.wlRange:
             self._chi2Data = []
@@ -2220,12 +2219,12 @@ class Open:
         #             pass
         # 
         ### Alex
-        widgets=[progressbar.Bar(marker='='),' (', progressbar.AbsoluteETA(), ') ',]
-        bar = progressbar.ProgressBar(max_value=len(self.allFits), widgets=widgets)
+        # widgets=[progressbar.Bar(marker='='),' (', progressbar.AbsoluteETA(), ') ',]
+        # bar = progressbar.ProgressBar(max_value=len(self.allFits), widgets=widgets)
         allMin = [self.allFits[0]]
         allMin[0]['nsigma'] =  _nSigmas(self.chi2_UD,  allMin[0]['chi2'], self.ndata()-1)             
         for i, f in enumerate(self.allFits):
-            bar.update(i+1)
+            # bar.update(i+1)
             chi2 = []
             if (f['best']['x']**2+f['best']['y']**2>=self.rmin**2) and \
             (f['best']['x']**2+f['best']['y']**2<=self.rmax**2):
@@ -2501,8 +2500,8 @@ class Open:
             # -- add sep and PA
             sep = np.sqrt(allMin2[i]['best']['x']**2 + allMin2[i]['best']['y']**2)
             PA = np.arctan2(allMin2[i]['best']['x'], allMin2[i]['best']['y'])
-            print(' %6s= %8.4fmas'%('sep', sep))
-            print(' %6s= %8.4fdeg'%('PA', PA*180/np.pi))
+            print(' | %6s= %8.4fmas'%(' sep', sep))
+            print(' | %6s= %8.4fdeg'%(' PA', PA*180/np.pi))
 
             # -- http://www.aanda.org/articles/aa/pdf/2011/11/aa17719-11.pdf section 3.2
             print(' | chi2r_UD=%4.2f, chi2r_BIN=%4.2f, NDOF=%d'%(self.chi2_UD,
@@ -3126,8 +3125,8 @@ class Open:
                 plt.ylabel(t.split(';')[0]+r': deg, mod 180')
             else:
                 if t.split(';')[0]=='cp': ### Alex
-                    _meas[w] = _meas[w]*180./np.pi
-                    _errs[w] = _errs[w]*180./np.pi
+                    _meas[w] = _meas[w]
+                    _errs[w] = _errs[w]
                 res = (_meas[w]-_mod[w])/_errs[w]
                 plt.errorbar(X, _meas[w]+oV2*offset, fmt='o', yerr=_errs[w],# marker=None,
                              color=blue, alpha=1., zorder=1)
@@ -3381,7 +3380,7 @@ class Open:
                             tmp = tmp.replace([np.inf,-np.inf], np.nan)
                             # print(tmp)
                             self._chi2Data[k].append(tmp.to_numpy())
-                    if self._rawData[k][0][:2] in ['t3','cp','ic']: 
+                    if self._rawData[k][0][:2] in ['t3','cp', 'ic']: 
                         if kk==0: 
                             self._chi2Data.append([self._rawData[k][0]])  
                         else: 

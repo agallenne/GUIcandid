@@ -830,28 +830,19 @@ def _nSigmas(chi2r_TEST, chi2r_TRUE, NDOF):
     - chi2r_TEST is the hypothesis we test
     - chi2r_TRUE is what we think is what described best the data
     - NDOF: numer of degres of freedom
-
+ 
     chi2r_TRUE <= chi2r_TEST
-
+ 
     returns the nSigma detection
     """
-    p = scipy.stats.chi2.cdf(NDOF, NDOF*chi2r_TEST/chi2r_TRUE)
-    log10p = np.log10(np.maximum(p, 1e-161)) ### Alex: 50 sigmas max
-    #p = np.maximum(p, -100)
-    res = np.sqrt(scipy.stats.chi2.ppf(1-p,1))
-    # x = np.logspace(-15,-12,100)
-    # c = np.polyfit(np.log10(x), np.sqrt(scipy.stats.chi2.ppf(1-x,1)), 1)
-    c = np.array([-0.29842513,  3.55829518])
-    if isinstance(res, np.ndarray):
-        res[log10p<-15] = np.polyval(c, log10p[log10p<-15])
-        res = np.nan_to_num(res)
-        res += 90*(res==0)
-    else:
-        if log10p<-15:
-            res =  np.polyval(c, log10p)
-        if np.isnan(res):
-            res = 90.
-    return res
+    q = scipy.stats.chi2.cdf(NDOF*chi2r_TEST/chi2r_TRUE, NDOF)
+    p = 1.0-q
+    nsigma = np.sqrt(scipy.stats.chi2.ppf(1-p, 1))
+    if isinstance(nsigma, np.ndarray):
+        nsigma[p<1e-15] = np.sqrt(scipy.stats.chi2.ppf(1-1e-15, 1))
+    elif p<1e-15:
+        nsigma = np.sqrt(scipy.stats.chi2.ppf(1-1e-15, 1))
+    return nsigma
 
 def _injectCompanionData(data, delta, param):
     """

@@ -25,7 +25,7 @@ try:
     from scipy.misc import factorial
 except:
     from scipy.special import factorial
-
+    
 import random
 
 # -- defunct ;(

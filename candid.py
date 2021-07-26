@@ -1272,7 +1272,6 @@ class Open:
                                                         self.wlOffset + self.wavel[hdu.header['INSNAME']].max())
                 self.all_dwavel[hdu.header['INSNAME']] = hdu.data['EFF_BAND']*1e6
 
-                self.all_dwavel[hdu.header['INSNAME']] *= 2. # assume the limit is not the pixel
                 self.dwavel[hdu.header['INSNAME']] = \
                         np.mean(self.all_dwavel[hdu.header['INSNAME']])
                 spChan[hdu.header['INSNAME']] = len(hdu.data['EFF_WAVE'].flatten()) ### Alex
@@ -1330,7 +1329,7 @@ class Open:
                 data[hdu.data['FLAG']] = np.nan # we'll deal with that later...
                 data[hdu.data['T3PHIERR']>1e8] = np.nan # we'll deal with that later...
                 data[hdu.data['T3PHIERR']==0] = np.nan # we'll deal with that later...  ### Alex
-                data[hdu.data['T3PHI']>200] = np.nan # we'll deal with that later...
+                data[hdu.data['T3PHI']>200] = np.nan # we'll deal with that later... ### Alex
 
                 if len(data.shape)==1:
                     data = np.array([np.array([d]) for d in data])
@@ -1457,8 +1456,8 @@ class Open:
                                    +(hdu.data['U1COORD']+hdu.data['V2COORD'])**2).max())
                 Bmax = np.sqrt(Bmax)
                 maxRes = max(maxRes, Bmax/self.wavel[ins].min())
-                self.smearFov = min(self.smearFov, 2*self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
-                self.diffFov = min(self.diffFov, 1.2*self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi)
+                self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                self.diffFov = min(self.diffFov, self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi)
 
             if hdu.header['EXTNAME']=='OI_VIS2' and testInst(hdu):
                 data = hdu.data['VIS2DATA']
@@ -1521,7 +1520,7 @@ class Open:
                 Bmax = np.sqrt(Bmax)
                 maxRes = max(maxRes, Bmax/self.wavel[ins].min())
                 self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
-                self.diffFov = min(self.diffFov, 1.2*self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi)
+                self.diffFov = min(self.diffFov, self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi)
 
         self.minSpatialScale = min(1e-6/maxRes*180*3600*1000/np.pi, self.minSpatialScale)
         # print(' | Smallest spatial scale:    %7.2f mas'%(1e-6/maxRes*180*3600*1000/np.pi)) ### Alex
@@ -1612,7 +1611,7 @@ class Open:
         res = (_uv*self.rmax/(_wl-0.5*_dwavel)-_uv*self.rmax/(_wl+0.5*_dwavel))*0.004848136
         # print('DEBUG:', res)
         # CONFIG['Nsmear'] = max(int(np.ceil(4*res.max())), 3)
-        CONFIG['Nsmear'] = max(int(np.ceil(4*np.nanmax(res))), 3) ### Alex
+        CONFIG['Nsmear'] = max(int(np.ceil(4*res.max())), 3)
         print(' | setting up Nsmear = %d'%CONFIG['Nsmear'])
         return
 
@@ -1871,12 +1870,15 @@ class Open:
         plt.plot([x0, x0], [y0+0.05*self.rmax, y0+0.1*self.rmax], '-r', alpha=0.5, linewidth=2)
         plt.plot([x0-0.05*self.rmax, x0-0.1*self.rmax], [y0, y0], '-r', alpha=0.5, linewidth=2)
         plt.plot([x0+0.05*self.rmax, x0+0.1*self.rmax], [y0, y0], '-r', alpha=0.5, linewidth=2)
-        plt.text(0.9*x0, 0.9*y0, r'n$\sigma$=%3.1f'%s0, color='r')
+        if s0>8.:
+            plt.text(0.9*x0, 0.9*y0, r'n$\sigma$>%3.1f'%s0, color='r')
+        else:
+            plt.text(0.9*x0, 0.9*y0, r'n$\sigma$=%3.1f'%s0, color='r')            
         return
 
     def _cb_fitFunc(self, r):
         """
-        callback function for 
+        callback function for fitMap
         """
         # try:
         if '_k' in r.keys():
@@ -2281,7 +2283,7 @@ class Open:
             Naf *= 2
 
         if len(allMin)/Naf>0.6 or\
-             2*self.rmax/float(N)*np.sqrt(2)/2 > np.percentile([f['dist'] for f in self.allFits], 66):
+             2*np.sqrt(self.rmax**2-self.rmin**2)/float(N)*np.sqrt(2)/2 > np.percentile([f['dist'] for f in self.allFits], 66):
             print(' > WARNING, grid is too wide!!!', end=' ')
             print('--> try step=%4.2fmas'%(self.stepOptFitMap))
             reliability = 'unreliable'
@@ -2309,13 +2311,12 @@ class Open:
         # print('### DEBUG:', sys.maxsize, len(allMin)**2*Nx*Ny,end=' ')
         # print(len(allMin)**2*Nx*Ny < sys.maxsize)
 
-        dx = (R[1]-R[0]+np.diff(R)[0])/Nx
-        dy = (R[1]-R[0]+np.diff(R)[0])/Ny
 
-        _X, _Y = np.meshgrid(np.linspace(X[0]-np.diff(X)[0]/2.,
-                                         X[-1]+np.diff(X)[0]/2., Nx),
-                             np.linspace(Y[0]-np.diff(Y)[0]/2.,
-                                         Y[-1]+np.diff(Y)[0]/2., Ny))
+        _x = np.linspace(X[0]-np.diff(X)[0]/2., X[-1]+np.diff(X)[0]/2., Nx)
+        _y = np.linspace(Y[0]-np.diff(Y)[0]/2., Y[-1]+np.diff(Y)[0]/2., Ny)
+        _X, _Y = np.meshgrid(_x, _y)
+        dx = np.mean(np.diff(_x))
+        dy = np.mean(np.diff(_y))
 
         print(' | Rbf interpolating: %d points -> %d pixels map'%(len(allMin), Nx*Ny))
         if CONFIG['chi2 scale']!='auto':
@@ -2331,15 +2332,11 @@ class Open:
                                         [x['best']['y'] for x in allMin],
                                         [np.log10(x['chi2']) for x in allMin],
                                         function='linear')
-            # _Z = scipy.interpolate.griddata(([x['best']['x'] for x in allMin], [x['best']['y'] for x in allMin]), [np.log10(x['chi2']) for x in allMin], (_X, _Y), method='linear')
-
         else:
             rbf = scipy.interpolate.Rbf([x['best']['x'] for x in allMin],
                                         [x['best']['y'] for x in allMin],
                                         [x['chi2'] for x in allMin],
-                                        function='linear')
-            # _Z = scipy.interpolate.griddata(([x['best']['x'] for x in allMin], [x['best']['y'] for x in allMin]), [x['chi2'] for x in allMin], (_X, _Y), method='linear')
-        
+                                        function='linear')        
         _Z = rbf(_X, _Y)
         
         self.interpolatedMap = {'X': _X, 'Y': _Y, 'N':int(np.ceil(2*self.rmax/step))}   ### ALEX
@@ -2385,14 +2382,14 @@ class Open:
             if chi2Scale=='log':
                 if CONFIG['suptitle']:   ### Alex
                     plt.title('log10[$\chi^2$ best fit / $\chi^2_{UD}$]')
-                plt.pcolormesh(_X,#-dx,
-                               _Y,#-dy,
+                plt.pcolormesh(_X-dx/2,
+                               _Y-dy/2,
                                _Z-np.log10(self.chi2_UD), cmap=CONFIG['color map']+'_r')
             else:
                 if CONFIG['suptitle']:   ### Alex
                     plt.title('$\chi^2$ best fit / $\chi^2_{UD}$')
-                plt.pcolormesh(_X,#-dx,
-                               _Y,#-dy,
+                plt.pcolormesh(_X-dx/2,
+                               _Y-dy/2,
                                _Z/self.chi2_UD, cmap=CONFIG['color map']+'_r')
 
             plt.plot(0,0, '*y', ms=10) ### Alex
@@ -2428,8 +2425,8 @@ class Open:
             if CONFIG['suptitle']:   ### Alex
                 plt.title('n$\sigma$ of detection')
             
-            plt.pcolormesh(_X,#-dx,
-                           _Y,#-dy,
+            plt.pcolormesh(_X-dx/2,
+                           _Y-dy/2,
                            n_sigma, cmap=CONFIG['color map'], vmin=0)
             plt.colorbar(format='%0.2f', fraction=0.046, pad=0.04)
             plt.plot(0,0, '*y', ms=10) ### Alex
@@ -2491,6 +2488,7 @@ class Open:
             # -- add sep and PA
             sep = np.sqrt(allMin2[i]['best']['x']**2 + allMin2[i]['best']['y']**2)
             PA = np.arctan2(allMin2[i]['best']['x'], allMin2[i]['best']['y'])
+            print(' | for information: ')
             print(' | %6s= %8.4fmas'%(' sep', sep))
             print(' | %6s= %8.4fdeg'%(' PA', PA*180/np.pi))
 
@@ -2531,9 +2529,12 @@ class Open:
                             alpha=fs/12, linewidth=fs/4)
                 # ax1.text(x0, y0, r'%.2e'%(allMin[i]['chi2']/self.chi2_UD), color='r',
                 #         va='bottom', ha='left', fontsize=fs)
-                ax2.text(x0, y0, r'%3.1f$\sigma$'%s0, color='r',
+                if s0>8.:
+                    ax2.text(x0, y0, r' >%3.1f$\sigma$'%s0, color='r',
                         va='bottom', ha='left', fontsize=fs)
-
+                else:
+                    ax2.text(x0, y0, r'%3.1f$\sigma$'%s0, color='r',
+                        va='bottom', ha='left', fontsize=fs)
 
         if fig is not None:
             # plt.xlabel(r'E $\leftarrow\, \Delta \alpha$ (mas)')
@@ -2752,6 +2753,7 @@ class Open:
 
         print('')
         t0 = time.time()
+        allMasks = []
         for i in range(N): # -- looping fits
             if useMJD:
                 selected = [mjds[np.random.randint(len(mjds))] for i in range(len(mjds))]
@@ -2761,6 +2763,8 @@ class Open:
             tmp['_k'] = i
             # -- Bootstrap data:
             data = []
+            if useMJD:
+                allMasks.append(tuple(sorted(selected)))
             for d in self._chi2Data:
                 # -- for each data file
                 data.append([_d if i==0 else _d.copy() for i,_d in enumerate(d)]) # recreate a list of data
@@ -2793,6 +2797,7 @@ class Open:
                         data[-1][-1] = data[-1][-1]/mask[None,:]
                     else:
                         data[-1][-1] = data[-1][-1]/mask
+                    data[-1][-1] = np.nan_to_num(data[-1][-1], nan=1e8)
 
             if p is None:
                 # -- single thread:
@@ -2847,7 +2852,7 @@ class Open:
                          a['best']['y']!=param['y'] or
                          a['best']['f']!=param['f'] for a in self.allFits])
         lims = 16, 84
-        print(' | All fits:')
+        print(' | All fits [N=%d] 16, 50 and 84%% percentiles:'%len(x))
         print(' | x: %8.4f %8.4f %8.4f'%(np.percentile(x, 16),
                                          np.percentile(x, 50),
                                          np.percentile(x, 84)))
@@ -2880,7 +2885,7 @@ class Open:
         result['internal']['all fits'] = self.allFits
 
         print(' | %d fits ignored'%(len(x)-len(w[0])))
-        Nbins = int(np.sqrt(len(w[0])/2.5))
+        Nbins = int(np.sqrt(len(w[0])/2.5))+1
         ax = {}
         res['boot'] = {}
         res['ellipse'] = {}
@@ -3719,8 +3724,8 @@ class Open:
         if CONFIG['suptitle']:   ### Alex
             plt.title('n$\sigma$ of detection')
         
-        plt.pcolormesh(_X,#-dx,
-                       _Y,#-dy,
+        plt.pcolormesh(_X-dx/2,
+                       _Y-dy/2.,
                        n_sigma, cmap=CONFIG['color map'], vmin=0)
         plt.colorbar(format='%0.2f', fraction=0.046, pad=0.04)
         plt.plot(0,0, '*y', ms=10) ### Alex
@@ -3754,10 +3759,15 @@ class Open:
                             alpha=fs/12, linewidth=fs/4)
                 # ax1.text(x0, y0, r'%.2e'%(allMin[i]['chi2']/self.chi2_UD), color='r',
                 #         va='bottom', ha='left', fontsize=fs)
-                ax2.text(x0, y0, r'%3.1f$\sigma$'%s0, color='r',
-                        va='bottom', ha='left', fontsize=fs)
-        
-        
+                # ax2.text(x0, y0, r'%3.1f$\sigma$'%s0, color='r',
+                #         va='bottom', ha='left', fontsize=fs)
+                if s0>8.:
+                    ax2.text(0.9*x0, 0.9*y0, r'n$\sigma$>%3.1f'%s0, color='r',
+                             va='bottom', ha='left', fontsize=fs)
+                else:
+                    ax2.text(0.9*x0, 0.9*y0, r'n$\sigma$=%3.1f'%s0, color='r',
+                             va='bottom', ha='left', fontsize=fs)            
+                
         ### UV plot ###
         # u, v, wl = np.array([]), np.array([]), np.array([])        
         # if plotUV:
@@ -4015,7 +4025,7 @@ def _dpfit_leastsqFit(func, x, params, y, err=None, fitOnly=None, verbose=False,
             cord = None
         pfix={'best':pfix, 'uncer':uncer,
               'chi2':reducedChi2, 'model':model,
-              'fitOnly':fitOnly, 'info':info,
+              'fitOnly':fitOnly, 'info':info, 'mesg':mesg,
               'cov':cov, 'cor':cor, 'covd':covd, 'cord':cord,
               'x':x, 'y':y, 'err':err #
               }

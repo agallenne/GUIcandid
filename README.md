@@ -10,7 +10,8 @@ CANDID code/install/examples can be find in the original repository [here](https
       - Can select a spectral range
       - Can display the N best detections
       - Can add some binary parameters (Porb, ecc, MT and distance) as imput in fitMap
-        to directly estimate the maximum search (if known spectroscopic binary)
+        to directly estimate the maximum search (if known spectroscopic binary). NOT
+        IMPLEMENTED IN THE GUI YET
       
 To run the GUI, go to the directory then type:
 

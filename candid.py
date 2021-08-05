@@ -25,7 +25,7 @@ try:
     from scipy.misc import factorial
 except:
     from scipy.special import factorial
-    
+
 import random
 
 # -- defunct ;(
@@ -1804,7 +1804,10 @@ class Open:
         print(' | at X,Y  : %6.2f, %6.2f mas'%(x0, y0))
         #print(' | Nsigma  : %5.2f'%s0)
         print(' | NDOF=%d'%( self.ndata()-1),end=' ')
-        print(' | n sigma detection: %5.2f (fully uncorrelated errors)'%s0)
+        if s0>8.:
+            print(' | n sigma detection: >%5.0f (fully uncorrelated errors)'%s0)
+        else:
+            print(' | n sigma detection: %5.2f (fully uncorrelated errors)'%s0)
 
         plt.close(fig)
         if CONFIG['suptitle']:
@@ -2496,7 +2499,11 @@ class Open:
             print(' | chi2r_UD=%4.2f, chi2r_BIN=%4.2f, NDOF=%d'%(self.chi2_UD,
                                                                  allMin2[i]['chi2'],
                                                                  self.ndata()-1),end=' ')
-            print('-> n sigma: %5.2f (assumes uncorr data)'%allMin2[i]['nsigma'])
+            if allMin2[i]['nsigma']>8.:
+                print('-> n sigma: %5.0f (assumes uncorr data)'%allMin2[i]['nsigma'])
+            else:
+                print('-> n sigma: %5.2f (assumes uncorr data)'%allMin2[i]['nsigma'])
+
             try:
                 _dpfit_dispCor(allMin2[i])
             except:
@@ -3121,14 +3128,17 @@ class Open:
                 plt.ylabel(t.split(';')[0]+r': deg, mod 180')
             else:
                 if t.split(';')[0]=='cp': ### Alex
-                    _meas[w] = _meas[w]
-                    _errs[w] = _errs[w]
+                    _meas[w] = 180/np.pi*_meas[w]
+                    _errs[w] = 180/np.pi*_errs[w]
                 res = (_meas[w]-_mod[w])/_errs[w]
                 plt.errorbar(X, _meas[w]+oV2*offset, fmt='o', yerr=_errs[w],# marker=None,
                              color=blue, alpha=1., zorder=1)
                 # plt.scatter(X, _meas[w]+oV2*offset, c=_wl[w], marker=marker, cmap='hot_r',
                 #         alpha=0.5, linestyle=linestyle)
-                plt.plot(X, _mod[w]+oV2*offset, 'o', color=red, alpha=1., zorder=2)
+                if t.split(';')[0]=='cp': ### Alex
+                    plt.plot(X, 180/np.pi*_mod[w], 'o', color=red, alpha=1., zorder=2)
+                else:
+                    plt.plot(X, _mod[w]+oV2*offset, 'o', color=red, alpha=1., zorder=2)
                 if t.split(';')[0]=='cp': ### Alex
                     plt.ylabel('cp (deg)')
                 else:
@@ -3577,7 +3587,7 @@ class Open:
             n_sigma = self.n_sigma         
 
         hdu = fits.PrimaryHDU()
-        hdu.data = self.allf3s['Gallenne']
+        hdu.data = self.allf3s['Gallenne']/100.
 
         try:
             hdu.header['INSTRUME'] = self._fitsHandler[0].header['INSTRUME']

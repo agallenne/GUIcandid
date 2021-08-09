@@ -40,7 +40,7 @@ import sys
 
 from astropy import wcs ### Alex
 import matplotlib.ticker as mtick ### Alex
-from matplotlib.ticker import MultipleLocator ### Alex
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter ### Alex
 
 # import progressbar
 import matplotlib.cm as cm
@@ -1285,12 +1285,12 @@ class Open:
                             diam = 1.8
                         if 'UT' in hdu.data['TEL_NAME'][0]:
                             diam = 8.2
-                        if 'NACO' in  name:                                         ### Alex
-                            diam = 8.2                                              ### Alex
-                        if 'SAM' in  name:                                         ### Alex
-                            diam = 8.2                                              ### Alex
-                        if 'SPHERE_DATA' in  name:                                         ### Alex
-                            diam = 8.2                                              ### Alex
+                    if 'NACO' in  name:                                         ### Alex
+                        diam = 8.2                                              ### Alex
+                    if 'SAM' in  name:                                         ### Alex
+                        diam = 8.2                                              ### Alex
+                    if 'SPHERE_DATA' in  name:                                         ### Alex
+                        diam = 8.2                                              ### Alex
                 self.telArray[name] = diam
                 self.baselines[filename.split('/')[-1]] = hdu.data['STA_NAME'][0]   ### Alex
                 baseline = hdu.data['STA_NAME'][0]                                  ### Alex
@@ -1453,9 +1453,10 @@ class Open:
                 Bmax = (hdu.data['U1COORD']**2+hdu.data['V1COORD']**2).max()
                 Bmax = max(Bmax, (hdu.data['U2COORD']**2+hdu.data['V2COORD']**2).max())
                 Bmax = max(Bmax, ((hdu.data['U1COORD']+hdu.data['U2COORD'])**2
-                                   +(hdu.data['U1COORD']+hdu.data['V2COORD'])**2).max())
+                                   +(hdu.data['V1COORD']+hdu.data['V2COORD'])**2).max())
                 Bmax = np.sqrt(Bmax)
                 maxRes = max(maxRes, Bmax/self.wavel[ins].min())
+                # print('CP',Bmax, self.wavel[ins].min(), self.dwavel[ins])
                 self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
                 self.diffFov = min(self.diffFov, self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi)
 
@@ -1519,6 +1520,7 @@ class Open:
                 Bmax = (hdu.data['UCOORD']**2+hdu.data['VCOORD']**2).max()
                 Bmax = np.sqrt(Bmax)
                 maxRes = max(maxRes, Bmax/self.wavel[ins].min())
+                # print('V2',Bmax, self.wavel[ins].min(), self.dwavel[ins])
                 self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
                 self.diffFov = min(self.diffFov, self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi)
 
@@ -2342,7 +2344,7 @@ class Open:
                                         function='linear')        
         _Z = rbf(_X, _Y)
         
-        self.interpolatedMap = {'X': _X, 'Y': _Y, 'N':int(np.ceil(2*self.rmax/step))}   ### ALEX
+        self.interpolatedMap = {'X': _X, 'Y': _Y, 'N':int(np.ceil(2*self.rmax/step)), 'dx':dx, 'dy':dy}   ### ALEX
 
         # -- http://www.aanda.org/articles/aa/pdf/2011/11/aa17719-11.pdf section 3.2
         if chi2Scale=='log':
@@ -2537,7 +2539,7 @@ class Open:
                 # ax1.text(x0, y0, r'%.2e'%(allMin[i]['chi2']/self.chi2_UD), color='r',
                 #         va='bottom', ha='left', fontsize=fs)
                 if s0>8.:
-                    ax2.text(x0, y0, r' >%3.1f$\sigma$'%s0, color='r',
+                    ax2.text(x0, y0, r' n$\sigma$>%3.1f'%s0, color='r',
                         va='bottom', ha='left', fontsize=fs)
                 else:
                     ax2.text(x0, y0, r'%3.1f$\sigma$'%s0, color='r',
@@ -3325,7 +3327,7 @@ class Open:
 
     def detectionLimit(self, step=None, diam=None, fig=4, addCompanion=None,
                         removeCompanion=None, drawMaps=True, rmin=None, rmax=None,
-                        methods = ['Absil', 'Gallenne'], fratio=1., n_Sigma=3, fullMap=0):   ### Alex
+                        methods = ['Absil', 'Gallenne'], fratio=1., n_Sigma=3, fullMap=0, tickformat=[1., '%.1f']):   ### Alex
         
         """
         step: number of steps N in the map (map will be NxN)
@@ -3478,6 +3480,8 @@ class Open:
                 p.join()
             # -- take care of unfitted zone, for esthetics
             self.f3s[self.f3s<=0] = np.median(self.f3s[self.f3s>0])
+            # Take care of the central not fitted part (<rmin) Alex
+            self.f3s[allX[None,:]**2+allY[:,None]**2 < self.rmin**2] = 0
             self.allf3s[method] = self.f3s.copy()
 
         #print('it actually took %4.1f seconds'%(time.time()-t0))
@@ -3548,7 +3552,7 @@ class Open:
                                             self.rmax/float(N), 99)/100.)
 
         if not fig is None:
-            for m in methods:
+            for m in methods:            
                 plt.plot(r, self.detectionLimitResult[m+'_99_M'],
                         linewidth=3, alpha=0.5, label=m+' (90%)')   ### Alex
 
@@ -3562,14 +3566,20 @@ class Open:
         if not drawMaps:
             ax4 = ax3.twinx()
             mn, mx = ax3.get_ylim()
-            ax4.set_ylim(10**(-mx/2.5), 10**(-mn/2.5))
+            ax4.set_ylim(10**(-mn/2.5), 10**(-mx/2.5))
             ax4.set_yscale('log')
-            ax4.set_ylabel('contrast')
-            plt.xlabel('radial distance (mas)')
+            ax4.set_ylabel(r'contrast')
+            ax3.set_xlabel('radial distance (mas)')
             
-            ax4.grid(which='both', alpha=.5, linestyle=':') ### Alex
-            ax4.yaxis.set_major_locator(MultipleLocator(0.01)) ### Alex
-            # ax4.yaxis.set_minor_locator(MultipleLocator(0.005)) ### Alex      
+            # ax4.grid(which='both', alpha=.5, linestyle=':') ### Alex
+            # ax4.yaxis.set_major_locator(MultipleLocator(tickformat[0])) ### Alex
+            # ax4.yaxis.set_minor_locator(MultipleLocator(0.5)) ### Alex  
+            # ax4.yaxis.set_major_formatter(FormatStrFormatter(tickformat[1])) ### Alex  
+            ax4.get_shared_y_axes().join(ax4, ax3)
+
+        else:
+            ax3.set_xlabel('radial distance (mas)')
+  
               
         # -- store radial profile of detection limit:
         self.f3s = {'r(mas)':r}
@@ -3582,6 +3592,8 @@ class Open:
         return
 
     def saveAsFits(self, outfile, n_sigma=None): ### Alex
+
+
 
         if n_sigma == None:
             n_sigma = self.n_sigma         
@@ -3667,6 +3679,8 @@ class Open:
         _X = self.interpolatedMap['X']
         _Y = self.interpolatedMap['Y']
         _Z = self.interpolatedMap['chi2']
+        dx = self.interpolatedMap['dx']
+        dy = self.interpolatedMap['dy']
         n_sigma = self.interpolatedMap['nsigma']
         N = self.interpolatedMap['N']
         allMin2 = self.interpolatedMap['allMin2']
@@ -3706,14 +3720,14 @@ class Open:
         if CONFIG['chi2 scale'] =='log':
             if CONFIG['suptitle']:   ### Alex
                 plt.title('log10[$\chi^2$ best fit / $\chi^2_{UD}$]')
-            plt.pcolormesh(_X,#-dx,
-                           _Y,#-dy,
+            plt.pcolormesh(_X-dx/2,
+                           _Y-dy/2,
                            _Z, cmap=CONFIG['color map']+'_r')
         else:
             if CONFIG['suptitle']:   ### Alex
                 plt.title('$\chi^2$ best fit / $\chi^2_{UD}$')
-            plt.pcolormesh(_X,#-dx,
-                           _Y,#-dy,
+            plt.pcolormesh(_X-dx/2,
+                           _Y-dy/2,
                            _Z, cmap=CONFIG['color map']+'_r')
 
         plt.plot(0,0, '*y', ms=10) ### Alex

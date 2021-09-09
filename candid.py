@@ -3607,7 +3607,7 @@ class Open:
             ax4.get_shared_y_axes().join(ax4, ax3)
 
         else:
-            ax3.set_xlabel('radial distance (mas)')
+            plt.xlabel('radial distance (mas)')
   
               
         # -- store radial profile of detection limit:

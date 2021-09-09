@@ -84,15 +84,6 @@ __version__ = '1.0.3 | 2021/06/16' # many new features added: saving the nsigma 
                                    # possibility to plot more than 1 best detection, possibility to select a wavelength range (not in GUI yet)
                                    # 
 
-
-print("""
-========================== This is CANDID ==============================
-[C]ompanion [A]nalysis and [N]on-[D]etection in [I]nterferometric [D]ata
-                  https://github.com/amerand/CANDID
-========================================================================
-""")
-print(' version:', __version__)
-
 # -- some general parameters:
 CONFIG = {'color map':'cubehelix', # color map used
           'chi2 scale' : 'auto', # can be log
@@ -123,7 +114,15 @@ def variables():
         print("  CONFIG['%s']"%k, CONFIG[k])
     return
 
-variables()
+### Alex
+# print("""
+# ========================== This is CANDID ==============================
+# [C]ompanion [A]nalysis and [N]on-[D]etection in [I]nterferometric [D]ata
+#                   https://github.com/amerand/CANDID
+# ========================================================================
+# """)
+# print(' version:', __version__)
+# variables()
 
 __warningDwavel = True
 
@@ -300,11 +299,11 @@ try:
                      diam, diamc)
         return np.reshape(Vr+1j*Vi, uv[0].shape)
     _Vbin = _VbinCy
-    print('Using Cython visibilities computation (Faster than Numpy)')
+    # print('Using Cython visibilities computation (Faster than Numpy)') ### Alex
 except:
     # -- Using Numpy visibility function
     _Vbin = _VbinSlow
-    print('Using Numpy visibilities computation (Slower than Cython)')
+    # print('Using Numpy visibilities computation (Slower than Cython)')  ### Alex
 
 def _V2binSlow(uv, param):
     """
@@ -1070,6 +1069,18 @@ class Open:
           used (cos and sin of phase closure). Results are not strictly equivalent
         load OIFITS file assuming one target, one OI_VIS2, one OI_T3 and one WAVE table
         """
+        
+        ### Alex
+        print("""
+        ========================== This is CANDID ==============================
+        [C]ompanion [A]nalysis and [N]on-[D]etection in [I]nterferometric [D]ata
+                          https://github.com/amerand/CANDID
+        ========================================================================
+        """)
+        print(' version:', __version__)
+        variables()
+        print()
+
         self.wlOffset = wlOffset # mainly to correct AMBER poor wavelength calibration...
         self.v2bias = v2bias
         self.loadOnlyInstruments = instruments
@@ -1225,7 +1236,7 @@ class Open:
         self.wavel_3m = {} # -- min, mean, max
         self.telArray = {}
         self._rawData, self._delta = [], []
-        self.smearFov = 5e3 # bandwidth smearing FoV, in mas
+        self.smearFov = 100e3 # bandwidth smearing FoV, in mas ###Alex
         self.diffFov = 5e3 # diffraction FoV, in mas
         self.minSpatialScale = 5e3
         self._delta = []
@@ -1457,7 +1468,13 @@ class Open:
                 Bmax = np.sqrt(Bmax)
                 maxRes = max(maxRes, Bmax/self.wavel[ins].min())
                 # print('CP',Bmax, self.wavel[ins].min(), self.dwavel[ins])
-                self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                if 'GRAVITY' in ins: ###Alex
+                    if 'GRAVITY_FT' in ins:
+                        self.smearFovFT = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                    else:
+                        self.smearFovSC = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                else:
+                    self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
                 self.diffFov = min(self.diffFov, self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi)
 
             if hdu.header['EXTNAME']=='OI_VIS2' and testInst(hdu):
@@ -1521,14 +1538,23 @@ class Open:
                 Bmax = np.sqrt(Bmax)
                 maxRes = max(maxRes, Bmax/self.wavel[ins].min())
                 # print('V2',Bmax, self.wavel[ins].min(), self.dwavel[ins])
-                self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                if 'GRAVITY' in ins: ###Alex
+                    if 'GRAVITY_FT' in ins:
+                        self.smearFovFT = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                    else:
+                        self.smearFovSC = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                else:
+                    self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
                 self.diffFov = min(self.diffFov, self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi)
 
         self.minSpatialScale = min(1e-6/maxRes*180*3600*1000/np.pi, self.minSpatialScale)
         # print(' | Smallest spatial scale:    %7.2f mas'%(1e-6/maxRes*180*3600*1000/np.pi)) ### Alex
         print(' | Smallest spatial scale:    %7.2f mas'%(self.minSpatialScale))
         print(' | Diffraction Field of view: %7.2f mas'%(self.diffFov))
-        print(' | WL Smearing Field of view: %7.2f mas'%(self.smearFov))
+        if 'GRAVITY' in ins:
+            print(' | WL Smearing Field of view: FT: %7.2f mas, SC: %7.2f mas'%(self.smearFovFT, self.smearFovSC))
+        else:
+            print(' | WL Smearing Field of view: %7.2f mas'%(self.smearFov))            
         if 'SAM' not in ins:
             print(' | baselines: ',baseline)     ### Alex
         for instr in lenCP.keys():          ### Alex
@@ -2098,7 +2124,7 @@ class Open:
                 return
         else:
             print('')
-        print('')
+
         # -- parallel on N-1 cores
         p = self._pool()
         k = 0
@@ -2130,6 +2156,7 @@ class Open:
         if not p is None:
             p.close()
             p.join()
+
         print(' | grid of fit took %.1f seconds'%(time.time()-t0))
         print(' | Computing map of interpolated Chi2 minima')
 
@@ -2395,7 +2422,8 @@ class Open:
                     plt.title('$\chi^2$ best fit / $\chi^2_{UD}$')
                 plt.pcolormesh(_X-dx/2,
                                _Y-dy/2,
-                               _Z/self.chi2_UD, cmap=CONFIG['color map']+'_r')
+                               _Z/self.chi2_UD, cmap=CONFIG['color map']+'_r',
+                               shading='auto') ### Alex (to avoid new matplotlib warning)
 
             plt.plot(0,0, '*y', ms=10) ### Alex
 
@@ -2432,7 +2460,9 @@ class Open:
             
             plt.pcolormesh(_X-dx/2,
                            _Y-dy/2,
-                           n_sigma, cmap=CONFIG['color map'], vmin=0)
+                           n_sigma, cmap=CONFIG['color map'], vmin=0,
+                               shading='auto') ### Alex (to avoid new matplotlib warning)
+
             plt.colorbar(format='%0.2f', fraction=0.046, pad=0.04)
             plt.plot(0,0, '*y', ms=10) ### Alex
             ax2.set_aspect('equal') ### Alex
@@ -3130,22 +3160,21 @@ class Open:
                 plt.ylabel(t.split(';')[0]+r': deg, mod 180')
             else:
                 if t.split(';')[0]=='cp': ### Alex
-                    _meas[w] = 180/np.pi*_meas[w]
-                    _errs[w] = 180/np.pi*_errs[w]
+                    rad2deg = 180/np.pi
+                    _meas[w] = rad2deg*_meas[w]
+                    _errs[w] = rad2deg*_errs[w]
+                    _mod[w] = rad2deg*_mod[w]
                 res = (_meas[w]-_mod[w])/_errs[w]
                 plt.errorbar(X, _meas[w]+oV2*offset, fmt='o', yerr=_errs[w],# marker=None,
                              color=blue, alpha=1., zorder=1)
                 # plt.scatter(X, _meas[w]+oV2*offset, c=_wl[w], marker=marker, cmap='hot_r',
                 #         alpha=0.5, linestyle=linestyle)
                 if t.split(';')[0]=='cp': ### Alex
-                    plt.plot(X, 180/np.pi*_mod[w], 'o', color=red, alpha=1., zorder=2)
-                else:
-                    plt.plot(X, _mod[w]+oV2*offset, 'o', color=red, alpha=1., zorder=2)
-                if t.split(';')[0]=='cp': ### Alex
+                    plt.plot(X, _mod[w], 'o', color=red, alpha=1., zorder=2)
                     plt.ylabel('cp (deg)')
                 else:
+                    plt.plot(X, _mod[w]+oV2*offset, 'o', color=red, alpha=1., zorder=2)
                     plt.ylabel(t.split(';')[0])
-                if t.split(';')[0]=='v2':
                     plt.ylim(-0.1, 1.1+np.max(offset)*oV2)
 
             # -- residuals
@@ -3232,7 +3261,6 @@ class Open:
                     oCP = 0.0
 
                 if any(np.iscomplex(_meas[w])):
-                    print('ok')
                     res = (np.angle(_meas[w]/_mod[w])+np.pi)%(2*np.pi) - np.pi
                     res /= _errs[w]
                     res = np.float_(res)
@@ -3257,16 +3285,17 @@ class Open:
                                         # # ax1.set_ylabel(t.split(';')[0]+r': deg, mod 180')
                                         # ax1.set_ylabel('$\mathrm{CP\,(^\circ)}$')
                 else:
-                    print('okok')
                     res = (_meas[w]-_mod[w])/_errs[w]
-                    ax1.errorbar(X, _meas[w]+oV2*offset, fmt='.', yerr=_errs[w],
-                                 color=blue, zorder=1)
-                    # ax1.scatter(X, _meas[w]+oV2*offset, c=_wl[w], marker=marker, cmap='hot_r',
-                    #         alpha=0.5, linestyle=linestyle)
-                    ax1.plot(X, _mod[w]+oV2*offset, 'o', color=red, zorder=2)
-                    ax1.set_ylabel(str.upper(t.split(';')[0]))
-                    if t.split(';')[0]=='v2':
+                    if t.split(';')[0]=='cp':
+                        rad2deg = 180/np.pi
+                        ax1.set_ylabel(str.upper(t.split(';')[0])+' (deg)')
+                    else:
+                        rad2deg = 1
+                        ax1.set_ylabel(str.upper(t.split(';')[0]))
                         ax1.set_ylim(-0.1, 1.1+np.max(offset)*oV2)
+                    ax1.errorbar(X, rad2deg*_meas[w]+oV2*offset, fmt='.', yerr=_errs[w],
+                                 color=blue, zorder=1)
+                    ax1.plot(X, rad2deg*_mod[w]+oV2*offset, 'o', color=red, zorder=2)
                         
                                             # res = (_meas[w]-_mod[w])/_errs[w]
                                             # ax1.errorbar(X, _meas[w]+oV2*offset, fmt='.', yerr=_errs[w],
@@ -3793,39 +3822,39 @@ class Open:
                              va='bottom', ha='left', fontsize=fs)            
                 
         ### UV plot ###
-        # u, v, wl = np.array([]), np.array([]), np.array([])        
-        # if plotUV:
-        #     for obs in self._rawData:
-        #         if obs[0].split(';')[0] == 'v2':
-        #             u = np.append(u, obs[1])
-        #             v = np.append(v, obs[2])
-        #             wl = np.append(wl, obs[3])
-        #             wl0 = obs[3][0]
-        #             sp_chan = len(obs[3][0])
-        # 
-        #     if sp_chan<50:
-        #         pass
-        #     elif sp_chan<500:
-        #         wl = np.linspace(np.min(wl0), np.max(wl0), 25)
-        #     elif sp_chan<5000:
-        #         sp_chan = np.linspace(np.min(wl0), np.max(wl0), 50)
-        # 
-        #     if sp_chan>1:
-        #         colors = cm.bwr(np.linspace(0, 1, sp_chan))
-        #         # colors = cm.jet_r(np.linspace(0, 1, len(sp_chan)))
-        #     else:
-        #         colors = [self.colb]
-        # 
-        #     ax3 = plt.subplot(1,N,3)
-        #     for u_,v_,wl_ in zip(u,v,wl):   
-        #         print(u_)
-        #         print(wl_)         
-        #         ax3.plot(u_/wl_, v_/wl_, 'o', color=colors, mew=0, ms=5)
-        #         # ax3.plot(-u/wl, -v/wl, 'o', color=colors, mew=0, ms=5)
-        # 
-        #     plt.xlabel('U (M$\lambda$)')
-        #     plt.ylabel('V (M$\lambda$)')
-        #     plt.grid(lw=.2)
+        u, v, wl = np.array([]), np.array([]), np.array([])        
+        if plotUV:
+            for obs in self._rawData:
+                if obs[0].split(';')[0] == 'v2':
+                    u = np.append(u, obs[1])
+                    v = np.append(v, obs[2])
+                    wl = np.append(wl, obs[3])
+                    wl0 = obs[3][0]
+                    sp_chan = len(obs[3][0])
+        
+            if sp_chan<50:
+                pass
+            elif sp_chan<500:
+                wl = np.linspace(np.min(wl0), np.max(wl0), 25)
+            elif sp_chan<5000:
+                sp_chan = np.linspace(np.min(wl0), np.max(wl0), 50)
+        
+            if sp_chan>1:
+                colors = cm.bwr(np.linspace(0, 1, sp_chan))
+                # colors = cm.jet_r(np.linspace(0, 1, len(sp_chan)))
+            else:
+                colors = [self.colb]
+        
+            ax3 = plt.subplot(1,N,3)
+            for u_,v_,wl_ in zip(u,v,wl):   
+                print(u_)
+                print(wl_)         
+                ax3.plot(u_/wl_, v_/wl_, 'o', color=colors, mew=0, ms=5)
+                # ax3.plot(-u/wl, -v/wl, 'o', color=colors, mew=0, ms=5)
+        
+            plt.xlabel('U (M$\lambda$)')
+            plt.ylabel('V (M$\lambda$)')
+            plt.grid(lw=.2)
             
 
 def sliding_percentile(x, y, dx, percentile=50, smooth=True):
@@ -3968,7 +3997,6 @@ def _dpfit_leastsqFit(func, x, params, y, err=None, fitOnly=None, verbose=False,
                 uncer[k]= np.sqrt(np.abs(np.diag(cov)[i]))
                 if normalizedUncer:
                     uncer[k] *= np.sqrt(reducedChi2)
-
     if verbose:
         print('-'*30)
         print('REDUCED CHI2=', reducedChi2)
@@ -4287,4 +4315,4 @@ def _estimateCorrelation(data, errors, model):
         n+=1
     #print('%5.2f : ERR=%5.3f SYS=%5.3f STA=%5.3f %2d'%(chi2, np.mean(errors),
     #                                                   sys, np.sqrt(np.mean(errors**2)-sys**2), n))
-    return sys/np.mean(errors)
+    return sys/np.mean(errors)  

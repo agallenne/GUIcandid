@@ -3293,7 +3293,7 @@ class Open:
                         rad2deg = 1
                         ax1.set_ylabel(str.upper(t.split(';')[0]))
                         ax1.set_ylim(-0.1, 1.1+np.max(offset)*oV2)
-                    ax1.errorbar(X, rad2deg*_meas[w]+oV2*offset, fmt='.', yerr=_errs[w],
+                    ax1.errorbar(X, rad2deg*_meas[w]+oV2*offset, fmt='.', yerr=_errs[w]*rad2deg,
                                  color=blue, zorder=1)
                     ax1.plot(X, rad2deg*_mod[w]+oV2*offset, 'o', color=red, zorder=2)
                         

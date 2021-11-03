@@ -2944,27 +2944,55 @@ class Open:
                 if i1<i2:
                     nSigma=1
                     # == bootstrapping error ellipse from covariance
-                    sA2 = np.std(X)**2
-                    sB2 = np.std(Y)**2
-                    sAB = (X-X.mean())*(Y-Y.mean())
-                    sAB = np.sum(sAB)/(len(sAB)-1)
-                    covd[k1][k1] = sA2
-                    covd[k2][k2] = sB2
-                    covd[k1][k2] = sAB
-                    covd[k2][k1] = sAB
-                    cord[k1][k1] = 1
-                    cord[k2][k2] = 1
-                    cord[k1][k2] = sAB/np.sqrt(sA2*sB2)
-                    cord[k2][k1] = sAB/np.sqrt(sA2*sB2)
+                    ### Antoine
+                    # sA2 = np.std(X)**2
+                    # sB2 = np.std(Y)**2
+                    # sAB = (X-X.mean())*(Y-Y.mean())
+                    # sAB = np.sum(sAB)/(len(sAB)-1)
+                    # covd[k1][k1] = sA2
+                    # covd[k2][k2] = sB2
+                    # covd[k1][k2] = sAB
+                    # covd[k2][k1] = sAB
+                    # cord[k1][k1] = 1
+                    # cord[k2][k2] = 1
+                    # cord[k1][k2] = sAB/np.sqrt(sA2*sB2)
+                    # cord[k2][k1] = sAB/np.sqrt(sA2*sB2)
+                    # print('covd', covd)
+                    # print('cord', cord)
 
-                    a = np.arctan2(2*sAB, (sB2-sA2))/2
-                    sMa = np.sqrt(1/2.*(sA2+sB2-np.sqrt((sA2-sB2)**2+4*sAB**2)))
-                    sma = np.sqrt(1/2.*(sA2+sB2+np.sqrt((sA2-sB2)**2+4*sAB**2)))
+                    # 
+                    # a = np.arctan2(2*sAB, (sB2-sA2))/2
+                    # sMa = np.sqrt(1/2.*(sA2+sB2-np.sqrt((sA2-sB2)**2+4*sAB**2)))
+                    # sma = np.sqrt(1/2.*(sA2+sB2+np.sqrt((sA2-sB2)**2+4*sAB**2)))
+                    # th = np.linspace(0,2*np.pi,100)
+                    # _x, _y = sMa*np.cos(th), sma*np.sin(th)
+                    # _x, _y = _x*np.cos(a)+_y*np.sin(a), _y*np.cos(a)-_x*np.sin(a)
+                    # _x += np.mean(X)
+                    # _y += np.mean(Y)
+                    
+                    ### ALEX
+                    cov = np.cov(X, Y)
+                    vals, vecs = np.linalg.eigh(cov)
+                    order = vals.argsort()[::-1]
+                    vals, vecs = vals[order], vecs[:, order]
+                    a = np.arctan2(*vecs[:, 0][::-1])
+                    sMa, sma = np.sqrt(vals)*nSigma
                     th = np.linspace(0,2*np.pi,100)
                     _x, _y = sMa*np.cos(th), sma*np.sin(th)
-                    _x, _y = _x*np.cos(a)+_y*np.sin(a), _y*np.cos(a)-_x*np.sin(a)
+                    _x, _y = _x*np.cos(a)-_y*np.sin(a), _y*np.cos(a)+_x*np.sin(a)
                     _x += np.mean(X)
                     _y += np.mean(Y)
+
+                    covd[k1][k1] = cov[0,0]
+                    covd[k2][k2] = cov[1,1]
+                    covd[k1][k2] = cov[0,1]
+                    covd[k2][k1] = cov[1,0]
+                    cord[k1][k1] = 1
+                    cord[k2][k2] = 1
+                    cord[k1][k2] = cov[0,1]/np.sqrt(cov[0,0]*cov[1,1])
+                    cord[k2][k1] = cov[1,0]/np.sqrt(cov[0,0]*cov[1,1])
+                    
+                    
                     res['ellipse'][k1+k2] = (_x, _y)
                     if k1=='x' and k2=='y': ### Alex: saving ellipse parameters
                         xc, yc, PA, major, minor = X.mean(), Y.mean(), a, sMa, sma
@@ -2991,25 +3019,87 @@ class Open:
                         plt.plot(X, Y, '.', color='k', alpha=max(0.15, 0.5-0.12*np.log10(N)))
                     else:
                         plt.hist2d(X, Y, cmap='Blues', bins=int(Nbins/1.5))
+                    res['Y'] = Y
+                    res['X'] = X
+
 
                     # -- bootstrapped error ellipse
                     plt.plot(_x, _y, linestyle='-', color='b', linewidth=2)
                     # if len(ax[(i1,i2)].get_yticks())>5:
                     #        ax[(i1,i2)].set_yticks(ax[(i1,i2)].get_yticks()[::2])
+                    
+                    
+                    # from matplotlib.patches import Ellipse
+                    # import matplotlib.transforms as transforms
+                    # from skimage.measure import EllipseModel
+                    # cov = np.cov(X, Y)
+                    # pearson = cov[0, 1]/np.sqrt(cov[0, 0] * cov[1, 1])
+                    # # Using a special case to obtain the eigenvalues of this
+                    # # two-dimensionl dataset.
+                    # ell_radius_x = np.sqrt(1 + pearson)
+                    # ell_radius_y = np.sqrt(1 - pearson)
+                    # ellipse = Ellipse((0, 0), width=ell_radius_x * 2, height=ell_radius_y * 2,
+                    #                   facecolor='g')
+                    # 
+                    # # Calculating the stdandard deviation of x from
+                    # # the squareroot of the variance and multiplying
+                    # # with the given number of standard deviations.
+                    # scale_x = np.sqrt(cov[0, 0]) * 1
+                    # mean_x = np.mean(x)
+                    # 
+                    # # calculating the stdandard deviation of y ...
+                    # scale_y = np.sqrt(cov[1, 1]) * 1
+                    # mean_y = np.mean(y)
+                    # 
+                    # transf = transforms.Affine2D() \
+                    #     .rotate_deg(45) \
+                    #     .scale(scale_x, scale_y) \
+                    #     .translate(mean_x, mean_y)
+                    # 
+                    # ellipse.set_transform(transf + ax[(i1,i2)].transData)
+                    # ax[(i1,i2)].add_patch(ellipse)
+                    # ell = EllipseModel()
+                    # xy_ = np.array([ (xx,yy) for xx,yy in zip(_x,_y) ])
+                    # ell.estimate(xy_)
+                    # 
+                    # print('########')
+                    # # print(ell_radius_x,ell_radius_x)
+                    # print('params',ell.params)
+                    
+                    
 
                     if k1!='chi2' and k2!='chi2':
-                        sA2 = refFit['covd'][k1][k1]
-                        sB2 = refFit['covd'][k2][k2]
-                        sAB = refFit['covd'][k1][k2]
-                        a = np.arctan2(2*sAB, (sB2-sA2))/2
-                        sMa = np.sqrt(1/2.*(sA2+sB2-np.sqrt((sA2-sB2)**2+4*sAB**2)))
-                        sma = np.sqrt(1/2.*(sA2+sB2+np.sqrt((sA2-sB2)**2+4*sAB**2)))
+                        ### Antoine
+                        # sA2 = refFit['covd'][k1][k1]
+                        # sB2 = refFit['covd'][k2][k2]
+                        # sAB = refFit['covd'][k1][k2]
+                        # a = np.arctan2(2*sAB, (sB2-sA2))/2
+                        # sMa = np.sqrt(1/2.*(sA2+sB2-np.sqrt((sA2-sB2)**2+4*sAB**2)))
+                        # sma = np.sqrt(1/2.*(sA2+sB2+np.sqrt((sA2-sB2)**2+4*sAB**2)))
+                        # th = np.linspace(0,2*np.pi,100)
+                        # _x, _y = sMa*np.cos(th), sma*np.sin(th)
+                        # _x, _y = _x*np.cos(a)+_y*np.sin(a), _y*np.cos(a)-_x*np.sin(a)
+                        # _x += refFit['best'][k1]
+                        # _y += refFit['best'][k2]
+
+                        ### ALEX
+                        cov[0,0] = refFit['covd'][k1][k1]
+                        cov[1,1] = refFit['covd'][k2][k2]
+                        cov[0,1] = refFit['covd'][k1][k2]
+                        cov[1,0] = refFit['covd'][k2][k1]
+                        vals, vecs = np.linalg.eigh(cov)
+                        order = vals.argsort()[::-1]
+                        vals, vecs = vals[order], vecs[:, order]
+                        a = np.arctan2(*vecs[:, 0][::-1])
+                        sMa, sma = np.sqrt(vals)*nSigma
                         th = np.linspace(0,2*np.pi,100)
                         _x, _y = sMa*np.cos(th), sma*np.sin(th)
-                        _x, _y = _x*np.cos(a)+_y*np.sin(a), _y*np.cos(a)-_x*np.sin(a)
+                        _x, _y = _x*np.cos(a)-_y*np.sin(a), _y*np.cos(a)+_x*np.sin(a)
                         _x += refFit['best'][k1]
                         _y += refFit['best'][k2]
                         plt.plot(_x, _y, linestyle='--', color='r', linewidth=1)
+                        
+                        
                     else:
                         if k1=='chi2':
                             _x = refFit['chi2']
@@ -3073,6 +3163,8 @@ class Open:
 
         _dpfit_dispCor({'fitOnly':refFit['fitOnly'], 'cord':cord})
         self.bootRes = res
+        # self.bootRes['X'] = X
+        # self.bootRes['Y'] = Y
         result['result'] = {'best':{k:res['boot'][k][0] for k in res['boot'].keys()},
                             'uncer':{k:res['boot'][k][1:] for k in res['boot'].keys()},
                             'ellipse':res['ellipse'],

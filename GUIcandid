@@ -12,20 +12,35 @@ import multiprocessing
 import candid
 import matplotlib.pyplot as plt
 import numpy as np
+import platform
 
 
 class Ui_MainWindow(object):
+
+    # def __init_(self):
+    #     print(candid.__version__)
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(765, 448)
+
+        OS = platform.system()
 
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.label_Setup = QtWidgets.QLabel(self.centralwidget)
         self.label_Setup.setGeometry(QtCore.QRect(5, 5, 376, 171))
         
-        font = QtGui.QFont()
-        font.setPointSize(14)
+        fontFamily = 'Arial'
+        font = QtGui.QFont(fontFamily)
+        if OS == 'Linux':
+            font.setPointSize(12)
+            btn_length = 115
+            btn_height = 30
+        else:
+            font.setPointSize(14)
+            btn_length = 125
+            btn_height = 35
         font.setBold(True)
         font.setUnderline(False)
         font.setWeight(75)
@@ -41,15 +56,15 @@ class Ui_MainWindow(object):
         self.label_Setup.setObjectName("label_Setup")
         
         self.pushButton_LoadOI = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_LoadOI.setGeometry(QtCore.QRect(15, 30, 125, 34))
+        self.pushButton_LoadOI.setGeometry(QtCore.QRect(15, 30, btn_length, btn_height))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.pushButton_LoadOI.sizePolicy().hasHeightForWidth())
-        self.pushButton_LoadOI.setSizePolicy(sizePolicy)
-        font = QtGui.QFont()
-        font.setPointSize(13)
-        self.pushButton_LoadOI.setFont(font)
+        self.pushButton_LoadOI.setStyleSheet("QPushButton { text-align: center; }")
+        # font = QtGui.QFont()
+        # font.setPointSize(13)
+        self.pushButton_LoadOI.setFont(QtGui.QFont(fontFamily,12))
         self.pushButton_LoadOI.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.pushButton_LoadOI.setIconSize(QtCore.QSize(16, 16))
         self.pushButton_LoadOI.setObjectName("pushButton_LoadOI")
@@ -57,15 +72,15 @@ class Ui_MainWindow(object):
         self.pushButton_LoadOI.setToolTip('Select oifit file(s) to load\n\nLoaded file(s): 0')
 
         self.pushButton_ClosePlots = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_ClosePlots.setGeometry(QtCore.QRect(132, 30, 125, 34))
+        self.pushButton_ClosePlots.setGeometry(QtCore.QRect(132, 30, btn_length, btn_height))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.pushButton_ClosePlots.sizePolicy().hasHeightForWidth())
         self.pushButton_ClosePlots.setSizePolicy(sizePolicy)
-        font = QtGui.QFont()
-        font.setPointSize(13)
-        self.pushButton_ClosePlots.setFont(font)
+        # font = QtGui.QFont()
+        # font.setPointSize(13)
+        self.pushButton_ClosePlots.setFont(QtGui.QFont(fontFamily,12))
         self.pushButton_ClosePlots.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.pushButton_ClosePlots.setIconSize(QtCore.QSize(16, 16))
         self.pushButton_ClosePlots.setObjectName("pushButton_ClosePlots")
@@ -73,15 +88,15 @@ class Ui_MainWindow(object):
         self.pushButton_ClosePlots.clicked.connect(self.closeAllPlots)
 
         self.pushButton_Quit = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_Quit.setGeometry(QtCore.QRect(248, 30, 125, 34))
+        self.pushButton_Quit.setGeometry(QtCore.QRect(248, 30, btn_length, btn_height))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.pushButton_Quit.sizePolicy().hasHeightForWidth())
         self.pushButton_Quit.setSizePolicy(sizePolicy)
-        font = QtGui.QFont()
-        font.setPointSize(13)
-        self.pushButton_Quit.setFont(font)
+        # font = QtGui.QFont()
+        # font.setPointSize(13)
+        self.pushButton_Quit.setFont(QtGui.QFont(fontFamily,12))
         self.pushButton_Quit.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.pushButton_Quit.setIconSize(QtCore.QSize(16, 16))
         self.pushButton_Quit.setObjectName("pushButton_Quit")
@@ -93,7 +108,7 @@ class Ui_MainWindow(object):
         self.label_ColorMap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
         self.label_ColorMap.setObjectName("label_ColorMap")
         self.comboBox_ColorMap = QtWidgets.QComboBox(self.centralwidget)
-        self.comboBox_ColorMap.setGeometry(QtCore.QRect(94, 68, 145, 26))
+        self.comboBox_ColorMap.setGeometry(QtCore.QRect(94, 70, 100, 26))
         self.comboBox_ColorMap.setObjectName("comboBox_ColorMap")
         self.comboBox_ColorMap.addItems(['cubehelix', 'gist_earth', 'gist_stern','binary', 'CMRmap',
                     'Reds', 'Spectral', 'afmhot', 'cool', 'gnuplot'])
@@ -102,7 +117,7 @@ class Ui_MainWindow(object):
 
         self.checkBox_Title = QtWidgets.QCheckBox(self.centralwidget)
         self.checkBox_Title.setEnabled(True)
-        self.checkBox_Title.setGeometry(QtCore.QRect(262, 71, 59, 20))
+        self.checkBox_Title.setGeometry(QtCore.QRect(210, 71, 59, 20))
         self.checkBox_Title.setAccessibleName("")
         self.checkBox_Title.setObjectName("checkBox_Title")
         self.checkBox_Title.stateChanged.connect(self.selectSuptitle)
@@ -110,11 +125,11 @@ class Ui_MainWindow(object):
         self.checkBox_Title.setToolTip('Check if you want suptitle to be written on the plots')
 
         self.label_Ncores = QtWidgets.QLabel(self.centralwidget)
-        self.label_Ncores.setGeometry(QtCore.QRect(24, 109, 53, 16))
+        self.label_Ncores.setGeometry(QtCore.QRect(274, 73, 53, 16))
         self.label_Ncores.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
         self.label_Ncores.setObjectName("label_Ncores")
         self.lineEdit_Ncores = QtWidgets.QLineEdit(self.centralwidget)
-        self.lineEdit_Ncores.setGeometry(QtCore.QRect(80, 106, 45, 23))
+        self.lineEdit_Ncores.setGeometry(QtCore.QRect(335, 71, 30, 23))
         self.lineEdit_Ncores.setObjectName("lineEdit_Ncores")
         Ncores = str(max(multiprocessing.cpu_count(),1)-1)
         self.lineEdit_Ncores.setText(Ncores)
@@ -122,15 +137,27 @@ class Ui_MainWindow(object):
         self.lineEdit_Ncores.setToolTip('Select the number of cores for multiprocessing (default: N -1)')
 
         self.label_ExecTime = QtWidgets.QLabel(self.centralwidget)
-        self.label_ExecTime.setGeometry(QtCore.QRect(160, 109, 87, 16))
+        self.label_ExecTime.setGeometry(QtCore.QRect(24, 109, 87, 16))
         self.label_ExecTime.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
         self.label_ExecTime.setObjectName("label_ExecTime")
         self.lineEdit_ExecTime = QtWidgets.QLineEdit(self.centralwidget)
-        self.lineEdit_ExecTime.setGeometry(QtCore.QRect(249, 106, 45, 23))
+        self.lineEdit_ExecTime.setGeometry(QtCore.QRect(115, 106, 45, 23))
         self.lineEdit_ExecTime.setObjectName("lineEdit_ExecTime")
         self.lineEdit_ExecTime.setText('300')
         self.lineEdit_ExecTime.returnPressed.connect(self.changeExecTime)
         self.lineEdit_ExecTime.setToolTip('Select the execution time, for large grid it may take longer')
+
+        self.label_Region = QtWidgets.QLabel(self.centralwidget)
+        self.label_Region.setGeometry(QtCore.QRect(224, 109, 87, 16))
+        self.label_Region.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_Region.setObjectName("label_Region")
+        self.lineEdit_Region = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_Region.setGeometry(QtCore.QRect(275, 106, 90, 23))
+        self.lineEdit_Region.setObjectName("lineEdit_Region")
+        self.lineEdit_Region.setText('0,0')
+        self.region = 0
+        self.lineEdit_Region.returnPressed.connect(self.selectRegion)
+        self.lineEdit_Region.setToolTip('Select a specific (x,y) region and window size to be fit , i.e. outside (0,0)\nSyntax: Xc,Yc,size such that the window will be (Xc+/-size,Yc+/-size)')
 
         self.label_Instrument = QtWidgets.QLabel(self.centralwidget)
         self.label_Instrument.setGeometry(QtCore.QRect(24, 145, 70, 16))
@@ -152,18 +179,18 @@ class Ui_MainWindow(object):
         self.lineEdit_WLRange.setObjectName("lineEdit_WLRange")
         self.lineEdit_WLRange.setText('Full')
         self.lineEdit_WLRange.returnPressed.connect(self.changeWLRange)
-        self.lineEdit_WLRange.setToolTip('Select the wavelength range: lambda_min,lambda_max')
+        self.lineEdit_WLRange.setToolTip('Select the wavelength range\nSyntax: lambda_min,lambda_max')
         ######################
         ##### PARAMETERS #####
         ######################
         
         self.label_Parameters = QtWidgets.QLabel(self.centralwidget)
         self.label_Parameters.setGeometry(QtCore.QRect(5, 178, 376, 141))
-        font = QtGui.QFont()
-        font.setPointSize(14)
+        # font = QtGui.QFont()
+        # font.setPointSize(14)
         font.setBold(True)
         font.setUnderline(False)
-        font.setWeight(75)
+        # font.setWeight(75)
         self.label_Parameters.setFont(font)
         self.label_Parameters.setAccessibleName("")
         self.label_Parameters.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -175,7 +202,8 @@ class Ui_MainWindow(object):
         self.checkBox_CP.setGeometry(QtCore.QRect(18, 213, 43, 20))
         self.checkBox_CP.setAccessibleName("")
         self.checkBox_CP.setObjectName("checkBox_CP")
-        self.checkBox_CP.setChecked(False)
+        self.checkBox_CP.setChecked(True)
+        self.cpMode = False
         self.checkBox_CP.stateChanged.connect(self.selectObservables)
         self.checkBox_CP.setToolTip('Check to include CPs in the fit map')
         self.checkBox_CP.stateChanged.connect(self.selectCPmode)
@@ -203,11 +231,19 @@ class Ui_MainWindow(object):
         self.checkBox_iCP.setGeometry(QtCore.QRect(218, 213, 68, 20))
         self.checkBox_iCP.setAccessibleName("")
         self.checkBox_iCP.setObjectName("checkBox_iCP")
-        self.checkBox_iCP.setChecked(True)
-        self.cpMode = 'iCP'
+        self.checkBox_iCP.setChecked(False)
         self.checkBox_iCP.stateChanged.connect(self.selectObservables)
         self.checkBox_iCP.setToolTip('Check to use iCP instead of CP in the fit')
         self.checkBox_iCP.stateChanged.connect(self.selectiCPmode)
+
+        self.checkBox_V = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_V.setEnabled(True)
+        self.checkBox_V.setGeometry(QtCore.QRect(278, 213, 42, 20))
+        self.checkBox_V.setAccessibleName("")
+        self.checkBox_V.setObjectName("checkBox_V")
+        self.checkBox_V.setChecked(False)
+        self.checkBox_V.stateChanged.connect(self.selectObservables)
+        self.checkBox_V.setToolTip('Check to include |V| in the fit')
 
         self.doNotFit = {}
         self.addParam = {}
@@ -550,7 +586,7 @@ class Ui_MainWindow(object):
         self.pushButton_detectionMap.setToolTip('Start the detection limit calculation')
 
         self.pushButton_SaveFits = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_SaveFits.setGeometry(QtCore.QRect(525, 388, 87, 34))
+        self.pushButton_SaveFits.setGeometry(QtCore.QRect(525, 388, 87, 35))
         self.pushButton_SaveFits.setObjectName("pushButton_SaveFits")
         self.pushButton_SaveFits.setToolTip('Save the detection limit map in fits format')
         self.pushButton_SaveFits.clicked.connect(self.saveFits)
@@ -575,11 +611,13 @@ class Ui_MainWindow(object):
         self.label_Ncores.setText(_translate("MainWindow", "N Cores:"))
         self.checkBox_Title.setText(_translate("MainWindow", "Titles"))
         self.label_ExecTime.setText(_translate("MainWindow", "Exec. Time(s):"))
+        self.label_Region.setText(_translate("MainWindow", "Region:"))
         self.label_Instrument.setText(_translate("MainWindow", "Instrument:"))
         self.label_WLRange.setText(_translate("MainWindow", "WL range:"))
         self.label_Parameters.setText(_translate("MainWindow", "Fitted Parameters"))
         self.checkBox_CP.setText(_translate("MainWindow", "CP"))
         self.checkBox_V2.setText(_translate("MainWindow", "V2"))
+        self.checkBox_V.setText(_translate("MainWindow", "|V|"))
         self.checkBox_T3amp.setText(_translate("MainWindow", "T3amp"))
         self.checkBox_iCP.setText(_translate("MainWindow", "iCP"))
         self.checkBox_Diam1.setText(_translate("MainWindow", "diam1:"))
@@ -629,8 +667,23 @@ class Ui_MainWindow(object):
             try:
                 wlrange = wlrange.split(',')
                 self.candid.wlRange = [float(wlrange[0]), float(wlrange[1])]
+                print('\n | Wavelength range set to %.2f-%.2f um' %(self.candid.wlRange[0], self.candid.wlRange[1]))
             except:
                 self.candid.wlRange = []
+
+    def selectRegion(self):
+        region = self.lineEdit_Region.text()
+        if region=='0,0' or region=='0':
+            self.region = 0
+        else:
+            try:
+                region = region.split(',')
+                self.region = [float(region[0]), float(region[1]), float(region[2])]
+                print('\n | Region to search: x = [%.2f,%.2f]mas , y = [%.2f,%.2f]mas' %(self.region[0]-self.region[2], self.region[1]+self.region[2], self.region[1]-self.region[2],self.region[1]+self.region[2]))
+            except:
+                print('\n | Wrong syntax ...')
+                self.region = 0
+
 
     def selectCPmode(self):
         if self.checkBox_CP.isChecked():
@@ -644,13 +697,13 @@ class Ui_MainWindow(object):
 
     def selectiCPmode(self):
         if self.checkBox_iCP.isChecked():
-            self.cpMode = 'iCP'
+            self.cpMode = True
             self.openOI()
             self.checkBox_CP.setChecked(False)
             # self.checkBox_iCP.setEnabled(False)
             # self.checkBox_CP.setEnabled(True)
         else:
-            pass      
+            pass       
             
     def saveFits(self):
         
@@ -821,7 +874,7 @@ class Ui_MainWindow(object):
 
         self.candid.fitMap(step, rmin=rmin, rmax=rmax, fig=fig, doNotFit=self.doNotFit, addParam=self.addParam,
                            fratio= self.fratio if 'f' in self.doNotFit.keys() else 2.0, nbDetect=self.nbDetect,
-                           removeCompanion=self.removeComp)
+                           removeCompanion=self.removeComp, region=self.region)
 
         self.X = self.candid.bestFit['best']['x']
         self.Y = self.candid.bestFit['best']['y']
@@ -936,6 +989,14 @@ class Ui_MainWindow(object):
         except:
             pass
         try:
+            if not self.checkBox_V.isChecked():
+                self.candid.observables.remove('|v|')
+            else:
+                if '|v|' not in self.candid.observables:
+                    self.candid.observables.append('|v|')
+        except:
+            pass       
+        try:
             if not self.checkBox_CP.isChecked():
                 self.candid.observables.remove('cp')
             else:
@@ -995,11 +1056,61 @@ class Ui_MainWindow(object):
         self.pushButton_LoadOI.setToolTip('Select oifit file(s) to load\n\nLoaded file(s): '+Nfiles)
 
 
+import sys
+import traceback
+import logging
+# basic logger functionality
+log = logging.getLogger(__name__)
+handler = logging.NullHandler() # StreamHandler(stream=sys.stdout)
+log.addHandler(handler)
+
+def show_exception_box(log_msg):
+    """Checks if a QApplication instance is available and shows a messagebox with the exception message. 
+    If unavailable (non-console application), log an additional notice.
+    """
+    if QtWidgets.QApplication.instance() is not None:
+            errorbox = QtWidgets.QMessageBox()
+            errorbox.setText("Oops. An unexpected error occured:\n{0}".format(log_msg))
+            errorbox.exec_()
+    else:
+        log.debug("No QApplication instance available.")
+ 
+class UncaughtHook(QtCore.QObject):
+    _exception_caught = QtCore.Signal(object)
+ 
+    def __init__(self, *args, **kwargs):
+        super(UncaughtHook, self).__init__(*args, **kwargs)
+
+        # this registers the exception_hook() function as hook with the Python interpreter
+        sys.excepthook = self.exception_hook
+
+        # connect signal to execute the message box function always on main thread
+        self._exception_caught.connect(show_exception_box)
+ 
+    def exception_hook(self, exc_type, exc_value, exc_traceback):
+        """Function handling uncaught exceptions.
+        It is triggered each time an uncaught exception occurs. 
+        """
+        if issubclass(exc_type, KeyboardInterrupt):
+            # ignore keyboard interrupt to support console applications
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        else:
+            exc_info = (exc_type, exc_value, exc_traceback)
+            log_msg = '\n'.join([''.join(traceback.format_tb(exc_traceback)),
+                                 '{0}: {1}'.format(exc_type.__name__, exc_value)])
+            log.critical("Uncaught exception:\n {0}".format(log_msg), exc_info=exc_info)
+
+            # trigger message box show
+            self._exception_caught.emit(log_msg)
+
+
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
+    # create a global instance of our class to register the hookI
+    qt_exception_hook = UncaughtHook()
     MainWindow.show()
     sys.exit(app.exec_())

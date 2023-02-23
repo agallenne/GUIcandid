@@ -22,6 +22,6 @@ GUIcandid
 
 The GUI will open. Tool tips are available with some explanations of each function.
 
-Note: Only tested on MacOS 10.15.6 with Python 3.7.4
+Note: Only tested on MacOS 13.12 with Python 3.8.13 and Ubuntu 22.04.1 with Python 3.9.13
 
 ![GUI](figure.png)

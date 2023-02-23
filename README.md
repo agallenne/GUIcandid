@@ -12,6 +12,7 @@ CANDID code/install/examples can be find in the original repository [here](https
       - Can add some binary parameters (Porb, ecc, MT and distance) as imput in fitMap
         to directly estimate the maximum search (if known spectroscopic binary). NOT
         IMPLEMENTED IN THE GUI YET
+      - Can set a region to search instead of (0,0)
       
 To run the GUI, go to the directory then type:
 

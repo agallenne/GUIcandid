@@ -35,6 +35,12 @@ import random
 
 
 import multiprocessing
+try:
+    # -- see https://stackoverflow.com/questions/64174552
+    multiprocessing.set_start_method('spawn')
+except:
+    pass
+
 import os
 import sys
 
@@ -80,12 +86,18 @@ import pandas as pd ### Alex
 #__version__ = '1.0 | 2018/11/08'  # Converted to Python3
 #__version__ = '1.0.1 | 2019/01/18'# implement curve_fit to include correlated errors
 #__version__ = '1.0.2 | 2019/03/01' # many tweaks in the plots; x>0 fit only for only v2; implement history
-__version__ = '1.0.3 | 2021/06/16' # many new features added: saving the nsigma mam in a fits file, error ellise from the bootstrap are provided,
+#__version__ = '1.0.2.1 | 2021/06/16' # many new features added: saving the nsigma mam in a fits file, error ellise from the bootstrap are provided,
                                    # possibility to plot more than 1 best detection, possibility to select a wavelength range (not in GUI yet)
-                                   # 
+#__version__ = '1.0.3 | 2020/10/27'# corrected over-estimation of smearing
+#__version__ = '1.0.4 | 2021/03/02' # bug with bootstraping
+# __version__ = '1.0.5 | 2021/04/26' # bug in nSigma! not bad in practice
+# __version__ = '1.0.5.1 | 2021/12/02' # Adding |V| as an observable
+#__version__ = '1.0.6 | 2022/01/21' # tweaking default step, rmin and rmax 
+#__version__ = '1.0.7 | 2022/08/16' # avoid reprint in multiprocessing
+__version__ = '1.0.7.1 | 2022/12/01' # Possibility to fit a region not centered on 0
 
 # -- some general parameters:
-CONFIG = {'color map':'cubehelix', # color map used
+CONFIG = {'color map':'cubehelix_r', # color map used
           'chi2 scale' : 'auto', # can be log
           'long exec warning': 300, # in seconds
           'suptitle':False, # display over head title
@@ -102,7 +114,8 @@ def paramUnits(s):
         if s.startswith('f_') or s.startswith('fres_'):
             return '% primary'
         units = {'x':'mas', 'y':'mas', 'f':'% primary', 'diam*':'mas',
-                'diamc':'mas', 'alpha*': 'none', 'fres':'% primary'}
+                'diamc':'mas', 'alpha*': 'none', 'fres':'% primary',
+                'bs': 'none'}
         if s in units:
             return units[s]
         else:
@@ -114,15 +127,15 @@ def variables():
         print("  CONFIG['%s']"%k, CONFIG[k])
     return
 
-### Alex
-# print("""
-# ========================== This is CANDID ==============================
-# [C]ompanion [A]nalysis and [N]on-[D]etection in [I]nterferometric [D]ata
-#                   https://github.com/amerand/CANDID
-# ========================================================================
-# """)
-# print(' version:', __version__)
-# variables()
+if __name__=='__main__':
+    print("""
+    ========================== This is CANDID ==============================
+    [C]ompanion [A]nalysis and [N]on-[D]etection in [I]nterferometric [D]ata
+                    https://github.com/amerand/CANDID
+    ========================================================================
+    """)
+    print(' version:', __version__)
+    variables()
 
 __warningDwavel = True
 
@@ -222,10 +235,22 @@ def _VbinSlow(uv, param):
         fg = 0.0
         phig = 0.0
 
-    dl = np.linspace(-0.5,0.5, CONFIG['Nsmear'])
+    #dl = np.linspace(-0.5,0.5, CONFIG['Nsmear'])
 
     if CONFIG['Nsmear']<2:
         dl = np.array([0.])
+        Tr = np.array([1.0])
+    elif CONFIG['Nsmear']==3:
+        # -- original implementation, with top-hat transmission (slow and a little innacurate)
+        dl = np.linspace(-0.5, 0.5, CONFIG['Nsmear'])
+        Tr = np.ones(CONFIG['Nsmear'])
+    else: # -- gaussian
+        tsigma = 1/2.355 # FWHM of 1
+        #tsigma /=  0.57282 # FWH Maximum -> FWH Flux,
+        # -- takes most of the Gaussian transmission
+        dl = np.linspace(-0.8, 0.8, CONFIG['Nsmear'])
+        Tr = np.exp(-dl**2/(2*tsigma**2))
+    Tr /= np.sum(Tr)
 
     if np.isscalar(param['wavel'] ):
         wl = param['wavel']+dl*param['dwavel']
@@ -237,15 +262,15 @@ def _VbinSlow(uv, param):
         else:
             phig = phig[:,None]/wl[None,:]
             tmp += fg*Vg[:,None]*np.exp(-1j*phig)
-        res = (Vstar[:,None] + tmp)/(1.0 + f + fres + fg)
-        res = res.mean(axis=1)
+        tmp *= Tr[None,:]
+        # -- compute smearing
+        res = (Vstar + tmp.sum(axis=1))/(1.0 + f + fres + fg)
     else:
         # -- assumes u, v, and wavel are 2D
         wl = param['wavel'][:,:,None] + dl[None,None,:]*param['dwavel']
         phi = 2*np.pi*c*(uv[0][:,:,None]*param['x']+uv[1][:,:,None]*param['y'])/wl
-
         if not np.isscalar(Vcomp):
-            Vcomp = Vcomp[:,:,None]*(1.+0*wl)
+            Vcomp = Vcomp[:,:,None]
         tmp = f*Vcomp*np.exp(-1j*phi)
         if not np.isscalar(phig):
             phig = phig[:,:,None]/wl
@@ -254,7 +279,9 @@ def _VbinSlow(uv, param):
         if not np.isscalar(Vg):
             Vg = Vg[:,:,None]/(1+0*wl)
         tmp += fg*Vg*np.exp(-1j*phig)
-        res = (Vstar + tmp.mean(axis=2))/(1.0 + f + fres + fg)
+        tmp *= Tr[None,None,:]
+        # -- mean to compute smearing
+        res = (Vstar + tmp.sum(axis=2))/(1.0 + f + fres + fg)
     return res
 
 try:
@@ -299,11 +326,13 @@ try:
                      diam, diamc)
         return np.reshape(Vr+1j*Vi, uv[0].shape)
     _Vbin = _VbinCy
-    # print('Using Cython visibilities computation (Faster than Numpy)') ### Alex
+    if __name__=='__main__':
+        print('Using Cython visibilities computation (Faster than Numpy)') ### Alex
 except:
     # -- Using Numpy visibility function
     _Vbin = _VbinSlow
-    # print('Using Numpy visibilities computation (Slower than Cython)')  ### Alex
+    if __name__=='__main__':
+        print('Using Numpy visibilities computation (Slower than Cython)')
 
 def _V2binSlow(uv, param):
     """
@@ -440,8 +469,6 @@ def _V2binFast(uv, param):
     else:
         fres = 0.0
 
-    #print(diam, x, y, f, wavel, dwavel)
-    #print(u.shape, v.shape, wavel.shape, vr.shape)
     Nsmear = CONFIG['Nsmear']
     print('#'*12, f, diam, '#'*12)
     code = u"""
@@ -731,7 +758,8 @@ def _modelObservables(obs, param, flattened=True):
     --> will force the contrast ratio to be positive!
 
     Observations are entered as:
-    obs = [('v2;ins', u, v, wavel, ...),
+    obs = [('|v|;ins', u, v, wavel, ...),
+           ('v2;ins', u, v, wavel, ...),
            ('cp;ins', u1, v1, u2, v2, wavel, ...),
            ('t3;ins', u1, v1, u2, v2, wavel, ...)]
     each tuple can be longer, the '...' part will be ignored
@@ -765,6 +793,10 @@ def _modelObservables(obs, param, flattened=True):
             tmp['wavel'] = o[3]
             tmp['dwavel'] = dwavel
             res[i] = _V2binSlow([o[1], o[2]], tmp)
+        elif o[0].split(';')[0]=='|v|':
+            tmp['wavel'] = o[3]
+            tmp['dwavel'] = dwavel
+            res[i] = np.abs(_VbinSlow([o[1], o[2]], tmp))          
         elif o[0].split(';')[0].startswith('v2_'): # polynomial fit
             p = int(o[0].split(';')[0].split('_')[1])
             n = int(o[0].split(';')[0].split('_')[2])
@@ -883,6 +915,8 @@ def _generateFitData(chi2Data, observables, instruments):
 
             if c[0].split(';')[0] == 'v2':
                 _uv = np.append(_uv, np.sqrt(c[1].flatten()**2+c[2].flatten()**2)/c[3].flatten())
+            elif c[0].split(';')[0] == '|v|':
+                _uv = np.append(_uv, np.sqrt(c[1].flatten()**2+c[2].flatten()**2)/c[3].flatten())
             elif c[0].split(';')[0].startswith('v2_'):
                 _uv = np.append(_uv, np.sqrt(c[1].flatten()**2+c[2].flatten()**2)/c[3][1])
             elif c[0].split(';')[0] == 't3' or c[0].split(';')[0] == 'cp' or\
@@ -912,7 +946,7 @@ def _fitFunc(param, chi2Data, observables, instruments, fitAlso=[], doNotFit=[])
     if param['f']!=0:
         fitOnly.extend(['x', 'y', 'f'])
 
-    if 'v2' in observables or 't3' in observables:
+    if 'v2' in observables or 'v' in observables or 't3' in observables:
        for k in ['diam*', 'diamc', 'fres']:
            if k in param.keys():
                fitOnly.append(k)
@@ -1183,7 +1217,7 @@ class Open:
                 self.diam = 0.0
 
         if forcedDiam is None and \
-            ('v2' in self.observables or 't3' in self.observables) and\
+            ('v2' in self.observables or '|v|' in self.observables or 't3' in self.observables) and\
             ('v2' in [c[0].split(';')[0] for c in self._chi2Data] or
              't3' in [c[0].split(';')[0] for c in self._chi2Data]):
             tmp = {'x':0.0, 'y':0.0, 'f':0.0, 'diam*':guess, 'alpha*':self.alpha}
@@ -1236,8 +1270,9 @@ class Open:
         self.wavel_3m = {} # -- min, mean, max
         self.telArray = {}
         self._rawData, self._delta = [], []
-        self.smearFov = 100e3 # bandwidth smearing FoV, in mas ###Alex
+        self.smearFov = 100e5 # bandwidth smearing FoV, in mas ###Alex
         self.diffFov = 5e3 # diffraction FoV, in mas
+        self.smearFovFT, self.smearFovSC = 0,0
         self.minSpatialScale = 5e3
         self._delta = []
         ### Alex
@@ -1285,7 +1320,24 @@ class Open:
 
                 self.dwavel[hdu.header['INSNAME']] = \
                         np.mean(self.all_dwavel[hdu.header['INSNAME']])
+                if type(hdu.data['EFF_WAVE'])==np.ndarray:
+                    try:
+                        print(' | EFF_BAND/gradient(EFF_WAVE)', hdu.header['INSNAME'], '~',
+                            '%.3f'%np.mean(hdu.data['EFF_BAND']/np.gradient(hdu.data['EFF_WAVE'])))
+                    except:
+                        pass
+                else:
+                    # -- nothing to do
+                    pass
+
                 spChan[hdu.header['INSNAME']] = len(hdu.data['EFF_WAVE'].flatten()) ### Alex
+
+                # if type(hdu.data['EFF_WAVE'])==np.ndarray:
+                #     print(' | EFF_BAND/gradient(EFF_WAVE)', hdu.header['INSNAME'], '~',
+                #         '%.3f'%np.mean(hdu.data['EFF_BAND']/np.gradient(hdu.data['EFF_WAVE'])))
+                # else:
+                #     # -- nothing to do
+                #     pass
 
             if hdu.header['EXTNAME']=='OI_ARRAY':
                 name = hdu.header['ARRNAME']
@@ -1318,10 +1370,10 @@ class Open:
         amberWLmin, amberWLmax = 1.4, 2.5 # -- H+K
         #amberWLmin, amberWLmax = 1.0, 2.5 # -- J+H+K
 
-        lenCP, lenV2 = {}, {} ### Alex
+        lenCP, lenV2, lenV = {}, {}, {} ### Alex
         amberAtmBand = [1.0, 1.35, 1.9]
         for hdu in self._fitsHandler[1:]:
-            if hdu.header['EXTNAME'] in ['OI_T3', 'OI_VIS2'] and testInst(hdu):
+            if hdu.header['EXTNAME'] in ['OI_T3', 'OI_VIS2', 'OI_VIS'] and testInst(hdu):
                 ins = hdu.header['INSNAME']
                 # if type(ins) is not str:        ### Alex
                 #     ins = 'SAM'              ### Alex
@@ -1341,6 +1393,7 @@ class Open:
                 data[hdu.data['T3PHIERR']>1e8] = np.nan # we'll deal with that later...
                 data[hdu.data['T3PHIERR']==0] = np.nan # we'll deal with that later...  ### Alex
                 data[hdu.data['T3PHI']>200] = np.nan # we'll deal with that later... ### Alex
+                self.sta_index_T3 = hdu.data['STA_INDEX']   ### Alex
 
                 if len(data.shape)==1:
                     data = np.array([np.array([d]) for d in data])
@@ -1358,6 +1411,7 @@ class Open:
 
                 flags = np.invert(hdu.data['FLAG'].flatten())           ### Alex
                 lenCP[ins] = len(hdu.data['T3PHI'].flatten()[flags])    ### Alex
+                self.NDataT3 = len(hdu.data['T3PHI'])
                 
                 if not reducePoly is None:
                     p = []
@@ -1468,13 +1522,13 @@ class Open:
                 Bmax = np.sqrt(Bmax)
                 maxRes = max(maxRes, Bmax/self.wavel[ins].min())
                 # print('CP',Bmax, self.wavel[ins].min(), self.dwavel[ins])
-                if 'GRAVITY' in ins: ###Alex
-                    if 'GRAVITY_FT' in ins:
-                        self.smearFovFT = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
-                    else:
-                        self.smearFovSC = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
-                else:
-                    self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                # if 'GRAVITY' in ins: ###Alex
+                #     if 'GRAVITY_FT' in ins:
+                #         self.smearFovFT = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                #     else:
+                #         self.smearFovSC = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                # else:
+                #     self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
                 self.diffFov = min(self.diffFov, self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi)
 
             if hdu.header['EXTNAME']=='OI_VIS2' and testInst(hdu):
@@ -1487,9 +1541,11 @@ class Open:
                 data[hdu.data['FLAG']] = np.nan # we'll deal with that later...
                 # data[hdu.data['VIS2DATA']<0.] = np.nan # we'll deal with that later...  ### Alex
                 # data[hdu.data['VIS2DATA']>1.1] = np.nan # we'll deal with that later...  ### Alex
+                self.sta_index_VIS = hdu.data['STA_INDEX']   ### Alex
 
                 flags = np.invert(hdu.data['FLAG'].flatten())                           ### Alex
                 lenV2[ins] = len(hdu.data['VIS2DATA'].flatten()[flags])                 ### Alex
+                self.NDataVIS = len(hdu.data['VIS2DATA'])
                 
                 data /= self.v2bias
 
@@ -1525,7 +1581,7 @@ class Open:
                           hdu.data['MJD'],
                           np.array([x['A'+str(j)] for x in p]),
                           np.array([x['A'+str(j)] for x in ep])])
-                print('KLUDGE on V2 err')
+                # print('KLUDGE on V2 err')
                 self._rawData.append(['v2;'+ins,
                       hdu.data['UCOORD'][:,None]+0*self.wavel[ins][None,:],
                       hdu.data['VCOORD'][:,None]+0*self.wavel[ins][None,:],
@@ -1536,29 +1592,54 @@ class Open:
                 mjd = np.mean(hdu.data['MJD'].flatten())   ### Alex
                 Bmax = (hdu.data['UCOORD']**2+hdu.data['VCOORD']**2).max()
                 Bmax = np.sqrt(Bmax)
+                self.Bmax = Bmax*1
+                self.Bmin = np.sqrt(hdu.data['UCOORD']**2+hdu.data['VCOORD']**2).min()
                 maxRes = max(maxRes, Bmax/self.wavel[ins].min())
                 # print('V2',Bmax, self.wavel[ins].min(), self.dwavel[ins])
                 if 'GRAVITY' in ins: ###Alex
-                    if 'GRAVITY_FT' in ins:
-                        self.smearFovFT = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                    if ins=='GRAVITY_FT':
+                        self.smearFovFT = np.min([self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi])
                     else:
-                        self.smearFovSC = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
+                        self.smearFovSC = np.min([self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi])
                 else:
-                    self.smearFov = min(self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi)
-                self.diffFov = min(self.diffFov, self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi)
+                    self.smearFov = np.min([self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi])
+                self.diffFov = np.min([self.diffFov, self.wavel[ins].min()/self.telArray[arr]*180*3.6/np.pi])
+
+            ### Alex
+            if hdu.header['EXTNAME']=='OI_VIS':
+                data = hdu.data['VISAMP']
+                if len(data.shape)==1:
+                    data = np.array([np.array([d]) for d in data])
+                err = hdu.data['VISAMPERR']
+                if len(err.shape)==1:
+                    err = np.array([np.array([e]) for e in err])
+                data[hdu.data['FLAG']] = np.nan # we'll deal with that later...
+
+                flags = np.invert(hdu.data['FLAG'].flatten())                           
+                lenV[ins] = len(hdu.data['VISAMP'].flatten()[flags])    
+
+                self._rawData.append(['|v|;'+ins,
+                      hdu.data['UCOORD'][:,None]+0*self.wavel[ins][None,:],
+                      hdu.data['VCOORD'][:,None]+0*self.wavel[ins][None,:],
+                      self.wavel[ins][None,:]+0*hdu.data['VCOORD'][:,None],
+                      hdu.data['MJD'][:,None]+0*self.wavel[ins][None,:],
+                      data, err])             
 
         self.minSpatialScale = min(1e-6/maxRes*180*3600*1000/np.pi, self.minSpatialScale)
         # print(' | Smallest spatial scale:    %7.2f mas'%(1e-6/maxRes*180*3600*1000/np.pi)) ### Alex
         print(' | Smallest spatial scale:    %7.2f mas'%(self.minSpatialScale))
         print(' | Diffraction Field of view: %7.2f mas'%(self.diffFov))
         if 'GRAVITY' in ins:
-            print(' | WL Smearing Field of view: FT: %7.2f mas, SC: %7.2f mas'%(self.smearFovFT, self.smearFovSC))
+            print(' | WL Smearing Field of view: FT: %7.0f mas, SC: %7.0f mas'%(self.smearFovFT, self.smearFovSC))
         else:
             print(' | WL Smearing Field of view: %7.2f mas'%(self.smearFov))            
         if 'SAM' not in ins:
-            print(' | baselines: ',baseline)     ### Alex
+            print(' | baselines: %s  (min/max = %.1f/%.1f m)' %(baseline,self.Bmin,self.Bmax))     ### Alex
         for instr in lenCP.keys():          ### Alex
-            print(' | %s: %i V2 and %i CP measurements / %i spectral channels' %(instr, lenV2[instr], lenCP[instr], spChan[instr]))  ### Alex
+            print(' | %s: %i V2 and %i CP measurements / %i spectral channels (%.2f-%.2fum)' %(instr, lenV2[instr], lenCP[instr], spChan[instr], np.min(self.wavel[instr]),np.max(self.wavel[instr])))  ### Alex
+        # for instr in lenCP.keys():          ### Alex
+        #     print(' | Wavelength min/max for %s: %.2f/%.2fum'%(instr, np.min(self.wavel[instr]),np.max(self.wavel[instr])))
+        
         print(' | MJD: %.3f' %mjd)           ### Alex
         
         self._fitsHandler.close()
@@ -1623,8 +1704,9 @@ class Open:
                 tmp.append( _estimateCorrelation(d[-2][k], d[-1][k], model))
             self.corrSC.append(tmp)
             if verbose:
-                print('   ', d[0], '<E_syst / E_stat> = %4.2f'%(np.mean(tmp)))
+                print('   ', d[0], '<E_syst / E_stat> = %4.3f'%(np.mean(tmp)))
         return
+    
     def _estimateNsmear(self):
         _meas, _errs, _uv, _types, _wl = _generateFitData(self._rawData,
                                                           self.observables,
@@ -1638,8 +1720,7 @@ class Open:
                                         self.dwavel[c[0].split(';')[1]])
         res = (_uv*self.rmax/(_wl-0.5*_dwavel)-_uv*self.rmax/(_wl+0.5*_dwavel))*0.004848136
         # print('DEBUG:', res)
-        # CONFIG['Nsmear'] = max(int(np.ceil(4*res.max())), 3)
-        CONFIG['Nsmear'] = max(int(np.ceil(4*res.max())), 3)
+        CONFIG['Nsmear'] = np.max([int(np.ceil(4*res.max())), 3])
         print(' | setting up Nsmear = %d'%CONFIG['Nsmear'])
         return
 
@@ -1717,8 +1798,8 @@ class Open:
         as {'x':mas, 'y':mas, 'f':fratio in %}. 'f' will be forced to be positive.
         """
         if step is None:
-            step = 1/5. * self.minSpatialScale
-            print(' | step= not given, using 1/5 X smallest spatial scale = %4.2f mas'%step)
+            step = self.minSpatialScale
+            print(' | step= not given, using smallest spatial scale = %4.2f mas'%step)
 
         #--
         if rmin is None:
@@ -1861,10 +1942,10 @@ class Open:
 
         if CONFIG['chi2 scale']=='log':
             tit = 'log10[$\chi^2_\mathrm{BIN}/\chi^2_\mathrm{UD}$] with $\chi^2_\mathrm{UD}$='
-            plt.pcolormesh(X, Y, np.log10(self.mapChi2/self.chi2_UD), cmap=CONFIG['color map'])
+            plt.pcolormesh(X, Y, np.log10(self.mapChi2/self.chi2_UD), cmap=CONFIG['color map'], shading='auto')
         else:
             tit = '$\chi^2_\mathrm{BIN}/\chi^2_\mathrm{UD}$ with $\chi^2_\mathrm{UD}$='
-            plt.pcolormesh(X, Y, self.mapChi2/self.chi2_UD, cmap=CONFIG['color map'])
+            plt.pcolormesh(X, Y, self.mapChi2/self.chi2_UD, cmap=CONFIG['color map'], shading='auto')
         if self.chi2_UD>0.05:
             tit += '%4.2f'%(self.chi2_UD)
         else:
@@ -1887,8 +1968,7 @@ class Open:
         plt.pcolormesh(X, Y,
                        _nSigmas(self.chi2_UD,
                                 np.minimum(self.mapChi2, self.chi2_UD),
-                                self.ndata()),
-                       cmap=CONFIG['color map'])
+                                self.ndata()), cmap=CONFIG['color map'], shading='auto')
         plt.colorbar(format='%0.2f')
         # plt.xlabel(r'E $\leftarrow\, \Delta \alpha$ (mas)')
         plt.xlabel(r'$\Delta \alpha$ (mas)')                ### Alex
@@ -1931,7 +2011,9 @@ class Open:
 
     def fitMap(self, step=None,  fig=1, addCompanion=None,
                removeCompanion=None, rmin=None, rmax=None, fratio=2.0,
-               doNotFit={}, addParam={}, beta=1.0, showNmin=1, diam=None, nbDetect=1, saveFig=0):   ### Alex
+               doNotFit={}, addParam={}, beta=1.0, showNmin=1, diam=None, nbDetect=1, saveFig=0,
+               region=0):   ### Alex
+        
         """
         - filename: a standard OIFITS data file
         - N: starts fits on a NxN grid
@@ -1954,18 +2036,22 @@ class Open:
             The maximum allowed separation is then given by:
                     - rmax = amax*(1 + ecc)
                     - amax = (MT*(Porb/365.25)**2)**(1./3)/dist  # in arcsec
+
+        - if region=[xc,yc,winSize], the searchgrid will be centred on (xc,yc), and with the grid as
+                    (x,y) = (xc-winSize:xc+winSize, xc-winSize:xc+winSize)
+        
         """
         result = {'call':{'method':'fitMap'},
                   'internal':{},
                   'result':{}}
 
         if step is None:
-            step = np.sqrt(2)*self.minSpatialScale
-            print(' | step= not given, using sqrt(2) x smallest spatial scale = %4.2f mas'%step)
+            step = self.minSpatialScale
+            print(' | step= not given, using smallest spatial scale = %4.2f mas'%step)
         result['call']['step']=step
         if rmin is None:
             self.rmin = self.minSpatialScale
-            print(" | rmin= not given, set to smallest spatial scale: rmin=%5.2f mas"%(self.rmin))
+            print(" | rmin= not given, set to smallest spatial scale: rmin=%4.2f mas"%(self.rmin))
         else:
             self.rmin = rmin
         result['call']['rmin']=self.rmin
@@ -1973,7 +2059,7 @@ class Open:
         if rmax is None:
             self.rmax = 1.2*self.smearFov
             if not self.orbel.keys(): ### Alex
-                print(" | rmax= not given, set to 1.2*Field of View (bandwidth smearing): rmax=%5.2f mas"%(self.rmax))
+                print(" | rmax= not given, set to Field of View (bandwidth smearing): rmax=%5.2f mas"%(self.rmax))
         else:
             self.rmax = rmax
         
@@ -2004,7 +2090,7 @@ class Open:
         print(' | observables:', self.observables, 'from', self.ALLobservables)
         print(' | instruments:', self.instruments, 'from', self.ALLinstruments)
         print(' | baselines: ',[self.baselines[o] for o in self.baselines])   ### Alex
-        print(' | mean MJD: %.6f' %np.mean(self.allMJD))     ### Alex
+        print(' | mean JD: %.6f' %np.mean(self.allMJD+2400000.5))     ### Alex
         result['internal']['observables']=self.observables
         result['internal']['instruments']=self.instruments
 
@@ -2014,10 +2100,11 @@ class Open:
         ### Selecting wavelength range ### Alex
         np.seterr(invalid='ignore')
         if self.wlRange:
+            # print(self._rawData[0][3])
             self._chi2Data = []
             for k, data_1 in enumerate(self._rawData): 
                 for kk, data_2 in enumerate(self._rawData[k]): 
-                    if self._rawData[k][0][:2]=='v2': 
+                    if self._rawData[k][0][:2] in ['v2', '|v']: 
                         if kk==0: 
                             self._chi2Data.append([self._rawData[k][0]]) 
                         else: 
@@ -2026,7 +2113,6 @@ class Open:
                             tmp = pd.DataFrame(tmp)
                             tmp = tmp.dropna(axis=1)
                             tmp = tmp.replace([np.inf,-np.inf], np.nan)
-                            # print(tmp)
                             self._chi2Data[k].append(tmp.to_numpy())
                     if self._rawData[k][0][:2] in ['t3','cp','ic']: 
                         if kk==0: 
@@ -2039,6 +2125,17 @@ class Open:
                             tmp = tmp.replace([np.inf,-np.inf], np.nan)
                             # print(tmp)
                             self._chi2Data[k].append(tmp.to_numpy())
+                    # if self._rawData[k][0][:2]=='|v|': 
+                    #     if kk==0: 
+                    #         self._chi2Data.append([self._rawData[k][0]]) 
+                    #     else: 
+                    #         tmp_ = pd.DataFrame(self._rawData[k][kk]).fillna(np.inf).to_numpy()
+                    #         tmp = np.where((self._rawData[k][3]<self.wlRange[1])*(self._rawData[k][3]>self.wlRange[0]), tmp_, np.nan)
+                    #         tmp = pd.DataFrame(tmp)
+                    #         tmp = tmp.dropna(axis=1)
+                    #         tmp = tmp.replace([np.inf,-np.inf], np.nan)
+                    #         # print(tmp)
+                    #         self._chi2Data[k].append(tmp.to_numpy())
         else:
             self._chi2Data = self._copyRawData()
         
@@ -2075,8 +2172,8 @@ class Open:
                                     'ediam':self.ediam,
                                     'chi2':self.chi2_UD}
 
-        X = np.linspace(-self.rmax, self.rmax, N)
-        Y = np.linspace(-self.rmax, self.rmax, N)
+        # X = np.linspace(-self.rmax, self.rmax, N)
+        # Y = np.linspace(-self.rmax, self.rmax, N)
         # if self.observables==['v2']:
         #     X = np.linspace(0.0, self.rmax, N/2)
         # XY = []
@@ -2085,15 +2182,29 @@ class Open:
         #         XY.append((x, y))
         # self.Nfits = np.sum((X[:,None]**2+Y[None,:]**2>=self.rmin**2)*
         #                     (X[:,None]**2+Y[None,:]**2<=self.rmax**2))
+        
 
-        R = np.linspace(self.rmin**(1/beta), self.rmax**(1/beta),
+        ### Alex
+        if region:
+            self.rmin = 0
+            gridWidth = region[2]
+            Xc = region[0]
+            Yc = region[1]
+            Rc = np.sqrt(Xc**2 + Yc**2)
+            self.rmax = Rc + gridWidth
+            R = np.linspace(0**(1/beta), gridWidth**(1/beta),
+                        int(gridWidth/step+1))**beta
+        else:
+            Xc, Yc = 0, 0
+            R = np.linspace(self.rmin**(1/beta), self.rmax**(1/beta),
                     int((self.rmax-self.rmin)/step+1))**beta
+            
         XY = []
         for i,r in enumerate(R):
             n = max(4, int(2*np.pi*r/np.gradient(R)[i]))
             for t in np.linspace(0, 2*np.pi, n+1)[:-1]:
                 if not (self.observables==['v2'] and np.cos(t)<0):
-                    XY.append((r*np.cos(t), r*np.sin(t)))
+                    XY.append((r*np.cos(t)+Xc, r*np.sin(t)+Yc))
 
         self.allFits, self._prog = [{} for k in range(len(XY))], 0.0
         self._progTime = [time.time(), time.time()]
@@ -2131,28 +2242,35 @@ class Open:
         #t0 = time.time()
         params = []
         t0 = time.time()
-
+        
         for x,y in XY:
+            # if not region: ###ALEX
             if x**2+y**2>=self.rmin**2 and x**2+y**2<=self.rmax**2:
                 tmp={'diam*': self.diam if 'diam*' not in doNotFit.keys() else doNotFit['diam*'],
-                     'f':fratio if 'f' not in doNotFit.keys() else doNotFit['f'] , 'x':x, 'y':y, '_k':k,  ### Alex
-                     'alpha*':self.alpha}
-                for _k in self.dwavel.keys():
-                    tmp['dwavel;'+_k] = self.dwavel[_k]
-                tmp.update(addParam)
-                params.append(tmp)
-                if p is None:
-                    # -- single thread:
-                    self._cb_fitFunc(_fitFunc(params[-1], self._chi2Data,
-                                              self.observables, self.instruments,
-                                              None, doNotFit))
-                else:
-                    # -- multiple threads:
-                    p.apply_async(_fitFunc, (params[-1], self._chi2Data,
-                                             self.observables, self.instruments,
-                                             None, doNotFit),
-                                             callback=self._cb_fitFunc)
-                k += 1
+                        'f':fratio if 'f' not in doNotFit.keys() else doNotFit['f'] , 'x':x, 'y':y, '_k':k,  ### Alex
+                        'alpha*':self.alpha}
+                # else:
+                    # pass
+            # else:
+            #     tmp={'diam*': self.diam if 'diam*' not in doNotFit.keys() else doNotFit['diam*'],
+            #         'f':fratio if 'f' not in doNotFit.keys() else doNotFit['f'] , 'x':x, 'y':y, '_k':k,  ### Alex
+            #         'alpha*':self.alpha}
+            for _k in self.dwavel.keys():
+                tmp['dwavel;'+_k] = self.dwavel[_k]
+            tmp.update(addParam)
+            params.append(tmp)
+            if p is None:
+                # -- single thread:
+                self._cb_fitFunc(_fitFunc(params[-1], self._chi2Data,
+                                          self.observables, self.instruments,
+                                          None, doNotFit))
+            else:
+                # -- multiple threads:
+                p.apply_async(_fitFunc, (params[-1], self._chi2Data,
+                                         self.observables, self.instruments,
+                                         None, doNotFit),
+                                         callback=self._cb_fitFunc)
+            k += 1
         if not p is None:
             p.close()
             p.join()
@@ -2165,9 +2283,15 @@ class Open:
         for i,f in enumerate(self.allFits):
             f['init'] = params[i]
         # -- keep only fits within range
-        self.allFits = list(filter(lambda x: (x['best']['x']**2+x['best']['y']**2)>=self.rmin**2 and
+        if not region: ###ALEX
+            self.allFits = list(filter(lambda x: (x['best']['x']**2+x['best']['y']**2)>=self.rmin**2 and
                                              (x['best']['x']**2+x['best']['y']**2)<=self.rmax**2, self.allFits))
-
+        else:
+            self.allFits = list(filter(lambda x: x['best']['x']>=Xc-gridWidth and
+                                                  x['best']['x']<=Xc+gridWidth and
+                                                  x['best']['y']>=Yc-gridWidth and
+                                                  x['best']['y']<=Yc+gridWidth, self.allFits))
+        
         for i, f in enumerate(self.allFits):
             f['best']['f'] = np.abs(f['best']['f'])
             if 'diam*' in f['best'].keys():
@@ -2252,7 +2376,7 @@ class Open:
             # bar.update(i+1)
             chi2 = []
             if (f['best']['x']**2+f['best']['y']**2>=self.rmin**2) and \
-            (f['best']['x']**2+f['best']['y']**2<=self.rmax**2):
+                    (f['best']['x']**2+f['best']['y']**2<=self.rmax**2):
                 for a in allMin:
                     tmp, n = 0., 0.
                     for k in ['x', 'y', 'f', 'diam']:
@@ -2305,20 +2429,25 @@ class Open:
                                 np.percentile([f['dist'] for f in self.allFits], 50),
                                 np.percentile([f['dist'] for f in self.allFits], 90),))
 
+        print(' | grid step was %.1f mas'%step)
         self.Nopt = self.rmax/np.nanmedian([f['dist'] for f in self.allFits])*np.sqrt(2)
         self.Nopt = max(np.sqrt(2*len(allMin)), self.Nopt)
         self.Nopt = int(np.ceil(self.Nopt))
         self.stepOptFitMap = 2*self.rmax/self.Nopt
         result['internal']['optimum step'] = self.stepOptFitMap
         Naf = len(self.allFits)
-        if self.observables==['v2']:
-            Naf *= 2
+        # if self.observables==['v2']:
+        #     Naf *= 2
 
-        if len(allMin)/Naf>0.6 or\
-             2*np.sqrt(self.rmax**2-self.rmin**2)/float(N)*np.sqrt(2)/2 > np.percentile([f['dist'] for f in self.allFits], 66):
-            print(' > WARNING, grid is too wide!!!', end=' ')
+        # if len(allMin)/Naf>0.6 or\
+        #      2*np.sqrt(self.rmax**2-self.rmin**2)/float(N)*np.sqrt(2)/2 > np.percentile([f['dist'] for f in self.allFits], 66):
+        print(' | %.1f fit per minima with step %.2f'%(Naf/len(allMin), step))
+        print(' | minima density: %.1f mas'%np.sqrt(np.pi*(self.rmax**2-self.rmin**2)/len(allMin)))
+        if Naf/len(allMin)<1.5:
+            print(' > WARNING, grid may be too wide!', end=' ')
             print('--> try step=%4.2fmas'%(self.stepOptFitMap))
             reliability = 'unreliable'
+        
         elif N>1.2*self.Nopt:
             print(' | current grid step (%4.2fmas) is too fine!!!'%(2*self.rmax/float(N)),end=' ')
             print('--> %4.2fmas should be enough'%(self.stepOptFitMap))
@@ -2333,8 +2462,8 @@ class Open:
 
         # == plot chi2 min map:
         # -- limited in 32 but, hacking something dirty:
-        Nx = 2*len(R)+1
-        Ny = 2*len(R)+1
+        Nx = 2*int(self.rmax/step)+1
+        Ny = 2*int(self.rmax/step)+1
         if len(allMin)**2*Nx*Ny >= sys.maxsize:
             # -- interpolation grid is too large
             Nx = int(np.sqrt(sys.maxsize/(len(allMin)**2)))-1
@@ -2343,13 +2472,20 @@ class Open:
         # print('### DEBUG:', sys.maxsize, len(allMin)**2*Nx*Ny,end=' ')
         # print(len(allMin)**2*Nx*Ny < sys.maxsize)
 
-
+        ### Alex
+        if region:
+            X = np.linspace(Xc-gridWidth, Xc+gridWidth, N)
+            Y = np.linspace(Yc-gridWidth, Yc+gridWidth, N)
+        else:
+            X = np.linspace(-self.rmax, self.rmax, N)
+            Y = np.linspace(-self.rmax, self.rmax, N)
+        
         _x = np.linspace(X[0]-np.diff(X)[0]/2., X[-1]+np.diff(X)[0]/2., Nx)
         _y = np.linspace(Y[0]-np.diff(Y)[0]/2., Y[-1]+np.diff(Y)[0]/2., Ny)
         _X, _Y = np.meshgrid(_x, _y)
         dx = np.mean(np.diff(_x))
         dy = np.mean(np.diff(_y))
-
+        
         print(' | Rbf interpolating: %d points -> %d pixels map'%(len(allMin), Nx*Ny))
         if CONFIG['chi2 scale']!='auto':
             chi2Scale = CONFIG['chi2 scale']
@@ -2416,13 +2552,14 @@ class Open:
                     plt.title('log10[$\chi^2$ best fit / $\chi^2_{UD}$]')
                 plt.pcolormesh(_X-dx/2,
                                _Y-dy/2,
-                               _Z-np.log10(self.chi2_UD), cmap=CONFIG['color map']+'_r')
+                               _Z-np.log10(self.chi2_UD), cmap=CONFIG['color map'],
+                               shading='auto') ### Alex (to avoid new matplotlib warning)
             else:
                 if CONFIG['suptitle']:   ### Alex
                     plt.title('$\chi^2$ best fit / $\chi^2_{UD}$')
                 plt.pcolormesh(_X-dx/2,
                                _Y-dy/2,
-                               _Z/self.chi2_UD, cmap=CONFIG['color map']+'_r',
+                               _Z/self.chi2_UD, cmap=CONFIG['color map'],
                                shading='auto') ### Alex (to avoid new matplotlib warning)
 
             plt.plot(0,0, '*y', ms=10) ### Alex
@@ -2445,8 +2582,14 @@ class Open:
             plt.xlabel(r'$\Delta \alpha$ (mas)')                    ### Alex
             plt.ylabel(r'$\Delta \delta$ (mas)')                    ### Alex
         
-            plt.xlim(self.rmax-0.5*self.rmax/float(N), -self.rmax+0.5*self.rmax/float(N))
-            plt.ylim(-self.rmax+0.5*self.rmax/float(N), self.rmax-0.5*self.rmax/float(N))
+            if region:
+                plt.xlim(Xc-gridWidth, Xc+gridWidth)
+                plt.ylim(Yc-gridWidth, Yc+gridWidth)
+
+            else:
+                plt.xlim(self.rmax-0.5*self.rmax/float(N), -self.rmax+0.5*self.rmax/float(N))
+                plt.ylim(-self.rmax+0.5*self.rmax/float(N), self.rmax-0.5*self.rmax/float(N))
+            
             ax1.set_aspect('equal',)# 'datalim')
 
             ax2 = plt.subplot(1,2,2, sharex=ax1, sharey=ax1)
@@ -2461,7 +2604,7 @@ class Open:
             plt.pcolormesh(_X-dx/2,
                            _Y-dy/2,
                            n_sigma, cmap=CONFIG['color map'], vmin=0,
-                               shading='auto') ### Alex (to avoid new matplotlib warning)
+                               shading='auto') 
 
             plt.colorbar(format='%0.2f', fraction=0.046, pad=0.04)
             plt.plot(0,0, '*y', ms=10) ### Alex
@@ -2502,7 +2645,7 @@ class Open:
                         result['result']['best fit']['uncer'].pop('_k')
                     bestNsigma=allMin2[i]['nsigma']
 
-                    print(' | BEST FIT %d: chi2=%5.2f'%(ii, allMin2[i]['chi2']))
+                    print(' | BEST FIT %d: chi2=%.4f'%(ii, allMin2[i]['chi2']))
                     allMin2[i]['best']['f'] = np.abs(allMin2[i]['best']['f'] )
                     keys = list(allMin2[i]['best'].keys())
                     if '_k' in keys:
@@ -2634,7 +2777,7 @@ class Open:
         return
             
 
-    def fitBoot(self, N=None, param=None, fig=2, fitAlso=None, doNotFit=[], useMJD=True,
+    def fitBoot(self, N=None, param=None, fig=2, fitAlso=None, doNotFit=[], useMJD=True, useBaselines=False,
                 monteCarlo=False, corrSpecCha=None, nSigmaClip=4.5, addCompanion=None,
                 removeCompanion=None):
         """
@@ -2701,6 +2844,17 @@ class Open:
                         else: 
                             tmp_ = pd.DataFrame(self._rawData[k][kk]).fillna(np.inf).to_numpy()
                             tmp = np.where((self._rawData[k][5]<self.wlRange[1])*(self._rawData[k][5]>self.wlRange[0]), tmp_, np.nan)
+                            tmp = pd.DataFrame(tmp)
+                            tmp = tmp.dropna(axis=1)
+                            tmp = tmp.replace([np.inf,-np.inf], np.nan)
+                            # print(tmp)
+                            self._chi2Data[k].append(tmp.to_numpy())
+                    if self._rawData[k][0][:2]=='|v|': 
+                        if kk==0: 
+                            self._chi2Data.append([self._rawData[k][0]]) 
+                        else: 
+                            tmp_ = pd.DataFrame(self._rawData[k][kk]).fillna(np.inf).to_numpy()
+                            tmp = np.where((self._rawData[k][3]<self.wlRange[1])*(self._rawData[k][3]>self.wlRange[0]), tmp_, np.nan)
                             tmp = pd.DataFrame(tmp)
                             tmp = tmp.dropna(axis=1)
                             tmp = tmp.replace([np.inf,-np.inf], np.nan)
@@ -2786,6 +2940,14 @@ class Open:
         if useMJD:
             print(' | Boostrapping on %d MJDs: %.5f => %.5f'%(len(mjds),
                     np.nanmin(mjds), np.nanmax(mjds)))
+            if useBaselines:
+                print(' | Boostrapping also on %d baselines and %d triangles'%(self.NDataVIS,self.NDataT3))
+        else:
+            if useBaselines:
+                print(' | Boostrapping on %d baselines and %d triangles'%(self.NDataVIS,self.NDataT3))
+            else:
+                monteCarlo = True
+                print(' | Doing simple Monte Carlo')
 
         result['call']['useMJD'] = useMJD
         result['internal']['all MJD'] = mjds
@@ -2796,6 +2958,10 @@ class Open:
         for i in range(N): # -- looping fits
             if useMJD:
                 selected = [mjds[np.random.randint(len(mjds))] for i in range(len(mjds))]
+            if useBaselines:
+                idxVIS = list(np.random.randint(self.NDataVIS, size=self.NDataVIS))
+                idxT3 = list(np.random.randint(self.NDataT3, size=self.NDataT3))
+                
             tmp = {k:param[k] for k in param.keys()}
             for _k in self.dwavel.keys():
                 tmp['dwavel;'+_k] = self.dwavel[_k]
@@ -2814,29 +2980,62 @@ class Open:
                     else:
                         print('error! >> not implemented')
                         return
-                else:
+                elif useMJD:
                     # -- Bootstrapping:
-                    if useMJD:
-                        mask = np.zeros(d[-1].shape)
-                        for j in selected:
-                            mask[np.abs(d[-3]-j)<1e-8] += 1
-                    else:
-                        mask = np.random.rand(d[-1].shape[-1])
-                        mask = np.float_(mask>=1/3.) + np.float_(mask>=2/3.)
+                    # if useMJD:
+                    mask = np.zeros(d[-1].shape)
+                    for j in selected:
+                        mask[np.abs(d[-3]-j)<1e-8] += 1
+                    # else:
+                    #     mask = np.random.rand(d[-1].shape[-1])
+                    #     mask = np.float_(mask>=1/3.) + np.float_(mask>=2/3.)
 
                     # -- weight the error bars
                     # - chi2 = sum( ((yi-mi)/ei)**2 )/N
                     # - each data point's contribution goes as mask**2
                     # - hence we want sum(mask**2) = N
-
                     mask *= np.sqrt(mask.size/np.sum(mask**2))
                     mask[mask==0] = np.nan
 
+                    if useBaselines:
+                        if 'v' in d[0].split(';')[0]:
+                            data[-1][1:] = [dd[idxVIS] for dd in d[1:]]
+                        if 't3' in d[0].split(';')[0]:
+                            data[-1][1:] = [dd[idxT3] for dd in d[1:]]
+
+                        # print('d',d)
+                        # print('data',data[-1])
+
+                            
                     if len(d[-1].shape)==2:
                         data[-1][-1] = data[-1][-1]/mask[None,:]
                     else:
                         data[-1][-1] = data[-1][-1]/mask
+                    # print('data',data[-1][-1])
+                    # print('mask',mask)
                     data[-1][-1] = np.nan_to_num(data[-1][-1], nan=1e8)
+                else:
+                    # mask = np.random.rand(d[-1].shape[-1])
+                    # mask = np.float_(mask>=1/3.) + np.float_(mask>=2/3.)
+                    # # -- weight the error bars
+                    # # - chi2 = sum( ((yi-mi)/ei)**2 )/N
+                    # # - each data point's contribution goes as mask**2
+                    # # - hence we want sum(mask**2) = N
+                    # mask *= np.sqrt(mask.size/np.sum(mask**2))
+                    # mask[mask==0] = np.nan
+                    if 'v' in d[0].split(';')[0]:
+                        data[-1][1:] = [dd[idxVIS] for dd in d[1:]]
+                    if 't3' in d[0].split(';')[0]:
+                        data[-1][1:] = [dd[idxT3] for dd in d[1:]]     
+
+                    # if len(d[-1].shape)==2:
+                    #     data[-1][-1] = data[-1][-1]/mask[None,:]
+                    # else:
+                    #     data[-1][-1] = data[-1][-1]/mask
+                    # print('data',data[-1][-1])
+                    # print('mask',mask)
+                    data[-1][-1] = np.nan_to_num(data[-1][-1], nan=1e8)
+                      
 
             if p is None:
                 # -- single thread:
@@ -3171,6 +3370,9 @@ class Open:
                             'chi2':(med, errp, errm),
                             'covd':covd, 'cord':cord, 'fitOnly':refFit['fitOnly']}
         self.history.append(result)
+
+        #print('%.6f  %.4f  %.4f  %.4f  %.4f  %.4f'%(np.mean(self.allMJD+2400000.5), xc,yc,PA*180./np.pi, major,minor))
+
         return
         # -_-_-
 
@@ -3281,7 +3483,7 @@ class Open:
             plt.ylim(-np.max(np.abs(plt.ylim())), np.max(np.abs(plt.ylim())))
         return
 
-    def plotModel2(self, param=None, fig=3, spectral=False): ### Alex, used for publications, ploting only V2s and CPs
+    def plotModel2(self, param=None, fig=3, spectral=False, inst='', textV2=False): ### Alex, used for publications, ploting only V2s and CPs
         """
         param: what companion model to plot. If None, will attempt to use self.bestFit
         """
@@ -3303,7 +3505,6 @@ class Open:
             pass
         for _k in self.dwavel.keys():
             param['dwavel;'+_k] = self.dwavel[_k]
-        print(' (plotting _chi2Data instead of _rawData)')
         _meas, _errs, _uv, _types, _wl = _generateFitData(#self._rawData,
                                                           self._chi2Data,
                                                           self.observables,
@@ -3323,104 +3524,111 @@ class Open:
         for i,t in enumerate(set(_types)): # for each observables
         
             if t.split(';')[0]!='t3':
-                if t.split(';')[0]=='v2':
-                    l = 0
-                else:
-                    l = 1
-
-                w = np.where((_types==t)*(1-np.isnan(_meas)))
-                ax1 = plt.subplot2grid((4,2),(0,l), rowspan=3)
-                plt.setp(ax1.get_xticklabels(), visible=False)
-                # ax1 = plt.subplot(2,N,i+1)
-                # plt.title(t.split(';')[1])
-                #print('DEBUG:', set(np.round(_uv[w]*_wl[w],3)))
                 
-                if spectral:
-                    X = _wl[w]
-                    marker = '.'
-                    linestyle = '-'
-                    B = np.int_(1e3*_uv[w]*_wl[w])
-                    allB = sorted(list(set(B)))[::-1]
-                    offset = np.array([allB.index(b) for b in B])
-                    oV2 = 0.4
-                    oCP = 20
+                if inst not in t.split(';')[1]:
+                    pass
                 else:
-                    X = _uv[w]
-                    marker = '.'
-                    linestyle = '-'
-                    offset = np.zeros(len(w))
-                    oV2 = 0.0
-                    oCP = 0.0
-
-                if any(np.iscomplex(_meas[w])):
-                    res = (np.angle(_meas[w]/_mod[w])+np.pi)%(2*np.pi) - np.pi
-                    res /= _errs[w]
-                    res = np.float_(res)
-                    _measw = np.angle(_meas[w]).real
-                    _modw = np.angle(_mod[w]).real
-                    ax1.plot(X, 180/np.pi*(np.mod(_modw+np.pi/2, np.pi)-np.pi/2)+oCP*offset,
-                            'o', color=red, zorder=2)
-                    ax1.scatter(X, 180/np.pi*(np.mod(_measw+np.pi/2,np.pi)-np.pi/2)+oCP*offset,
-                                c=_wl[w], marker=marker, cmap='hot_r',
-                                alpha=0.5, linestyle=linestyle)
-                    ax1.errorbar(X, 180/np.pi*(np.mod(_measw+np.pi/2, np.pi)-np.pi/2) +oCP*offset,
-                                fmt='.', yerr=180/np.pi*_errs[w], color=blue, zorder=1)
-                    ax1.set_ylabel(str.upper(t.split(';')[0])+r': deg, mod 180')
-                    
-                                        # ax1.plot(X, 180/np.pi*(np.mod(_modw+np.pi/2, np.pi)-np.pi/2)+oCP*offset,
-                                        #         'o', color=red, zorder=2)
-                                        # # ax1.scatter(X, 180/np.pi*(np.mod(_measw+np.pi/2,np.pi)-np.pi/2)+oCP*offset,
-                                        #             # c=_wl[w], marker=marker, cmap='hot_r',
-                                        #             # alpha=0.5, linestyle=linestyle)
-                                        # ax1.errorbar(X, 180/np.pi*(np.mod(_measw+np.pi/2, np.pi)-np.pi/2) +oCP*offset,
-                                        #             fmt='.', yerr=180/np.pi*_errs[w], color=blue, zorder=1)
-                                        # # ax1.set_ylabel(t.split(';')[0]+r': deg, mod 180')
-                                        # ax1.set_ylabel('$\mathrm{CP\,(^\circ)}$')
-                else:
-                    res = (_meas[w]-_mod[w])/_errs[w]
-                    if t.split(';')[0]=='cp':
-                        rad2deg = 180/np.pi
-                        ax1.set_ylabel(str.upper(t.split(';')[0])+' (deg)')
+                
+                    if t.split(';')[0]=='v2':
+                        l = 0
                     else:
-                        rad2deg = 1
-                        ax1.set_ylabel(str.upper(t.split(';')[0]))
-                        ax1.set_ylim(-0.1, 1.1+np.max(offset)*oV2)
-                    ax1.errorbar(X, rad2deg*_meas[w]+oV2*offset, fmt='.', yerr=_errs[w]*rad2deg,
-                                 color=blue, zorder=1)
-                    ax1.plot(X, rad2deg*_mod[w]+oV2*offset, 'o', color=red, zorder=2)
+                        l = 1
+
+                    w = np.where((_types==t)*(1-np.isnan(_meas)))
+                    ax1 = plt.subplot2grid((4,2),(0,l), rowspan=3)
+                    plt.setp(ax1.get_xticklabels(), visible=False)
+                    if t.split(';')[0]=='v2' and textV2:
+                        plt.text(0.10, 0.08, textV2, horizontalalignment='center', verticalalignment='center', bbox= dict(facecolor='white', alpha=1, boxstyle='round'), transform = ax1.transAxes, fontsize=12)  
+                    # ax1 = plt.subplot(2,N,i+1)
+                    # plt.title(t.split(';')[1])
+                    #print('DEBUG:', set(np.round(_uv[w]*_wl[w],3)))
+                    
+                    if spectral:
+                        X = _wl[w]
+                        marker = '.'
+                        linestyle = '-'
+                        B = np.int_(1e3*_uv[w]*_wl[w])
+                        allB = sorted(list(set(B)))[::-1]
+                        offset = np.array([allB.index(b) for b in B])
+                        oV2 = 0.4
+                        oCP = 20
+                    else:
+                        X = _uv[w]
+                        marker = '.'
+                        linestyle = '-'
+                        offset = np.zeros(len(w))
+                        oV2 = 0.0
+                        oCP = 0.0
+
+                    if any(np.iscomplex(_meas[w])):
+                        res = (np.angle(_meas[w]/_mod[w])+np.pi)%(2*np.pi) - np.pi
+                        res /= _errs[w]
+                        res = np.float_(res)
+                        _measw = np.angle(_meas[w]).real
+                        _modw = np.angle(_mod[w]).real
+                        ax1.plot(X, 180/np.pi*(np.mod(_modw+np.pi/2, np.pi)-np.pi/2)+oCP*offset,
+                                'o', color=red, zorder=2)
+                        ax1.scatter(X, 180/np.pi*(np.mod(_measw+np.pi/2,np.pi)-np.pi/2)+oCP*offset,
+                                    c=_wl[w], marker=marker, cmap='hot_r',
+                                    alpha=0.5, linestyle=linestyle)
+                        ax1.errorbar(X, 180/np.pi*(np.mod(_measw+np.pi/2, np.pi)-np.pi/2) +oCP*offset,
+                                    fmt='.', yerr=180/np.pi*_errs[w], color=blue, zorder=1)
+                        ax1.set_ylabel(str.upper(t.split(';')[0])+r': deg, mod 180')
                         
-                                            # res = (_meas[w]-_mod[w])/_errs[w]
-                                            # ax1.errorbar(X, _meas[w]+oV2*offset, fmt='.', yerr=_errs[w],
-                                            #              color=blue, zorder=1)
-                                            # # ax1.scatter(X, _meas[w]+oV2*offset, c=_wl[w], marker=marker, cmap='hot_r',
-                                            #         # alpha=0.5, linestyle=linestyle)
-                                            # ax1.plot(X, _mod[w]+oV2*offset, 'o', color=red, zorder=2)
-                                            # if t.split(';')[0]=='v2':
-                                            #     ax1.set_ylabel('$\mathrm{V^2}$')
-                                            #     ax1.set_ylim(-0.1, 1.1+np.max(offset)*oV2)
-                                            # else:
-                                            #     ax1.set_ylabel('$\mathrm{T3_{amp}}$')
+                                            # ax1.plot(X, 180/np.pi*(np.mod(_modw+np.pi/2, np.pi)-np.pi/2)+oCP*offset,
+                                            #         'o', color=red, zorder=2)
+                                            # # ax1.scatter(X, 180/np.pi*(np.mod(_measw+np.pi/2,np.pi)-np.pi/2)+oCP*offset,
+                                            #             # c=_wl[w], marker=marker, cmap='hot_r',
+                                            #             # alpha=0.5, linestyle=linestyle)
+                                            # ax1.errorbar(X, 180/np.pi*(np.mod(_measw+np.pi/2, np.pi)-np.pi/2) +oCP*offset,
+                                            #             fmt='.', yerr=180/np.pi*_errs[w], color=blue, zorder=1)
+                                            # # ax1.set_ylabel(t.split(';')[0]+r': deg, mod 180')
+                                            # ax1.set_ylabel('$\mathrm{CP\,(^\circ)}$')
+                    else:
+                        res = (_meas[w]-_mod[w])/_errs[w]
+                        if t.split(';')[0]=='cp':
+                            rad2deg = 180/np.pi
+                            ax1.set_ylabel(str.upper(t.split(';')[0])+' (deg)')
+                        else:
+                            rad2deg = 1
+                            ax1.set_ylabel(str.upper(t.split(';')[0]))
+                            ax1.set_ylim(-0.1, 1.1+np.max(offset)*oV2)
+                        ax1.errorbar(X, rad2deg*_meas[w]+oV2*offset, fmt='.', yerr=_errs[w]*rad2deg,
+                                     color=blue, zorder=1)
+                        ax1.plot(X, rad2deg*_mod[w]+oV2*offset, 'o', color=red, zorder=2)
+                            
+                                                # res = (_meas[w]-_mod[w])/_errs[w]
+                                                # ax1.errorbar(X, _meas[w]+oV2*offset, fmt='.', yerr=_errs[w],
+                                                #              color=blue, zorder=1)
+                                                # # ax1.scatter(X, _meas[w]+oV2*offset, c=_wl[w], marker=marker, cmap='hot_r',
+                                                #         # alpha=0.5, linestyle=linestyle)
+                                                # ax1.plot(X, _mod[w]+oV2*offset, 'o', color=red, zorder=2)
+                                                # if t.split(';')[0]=='v2':
+                                                #     ax1.set_ylabel('$\mathrm{V^2}$')
+                                                #     ax1.set_ylim(-0.1, 1.1+np.max(offset)*oV2)
+                                                # else:
+                                                #     ax1.set_ylabel('$\mathrm{T3_{amp}}$')
 
-                # -- residuals
-                ax2 = plt.subplot2grid((4,2),(3,l), sharex=ax1)
-                ax2.plot(X, res, '.k', color=blue, alpha=1)
-                if spectral:
-                    ax2.set_xlabel('wavelength')
-                else:
-                    ax2.set_xlabel('Bmax / $\lambda$')
+                    # -- residuals
+                    ax2 = plt.subplot2grid((4,2),(3,l), sharex=ax1)
+                    ax2.plot(X, res, '.k', color=blue, alpha=1)
+                    if spectral:
+                        ax2.set_xlabel('wavelength')
+                    else:
+                        ax2.set_xlabel('Bmax / $\lambda$')
 
-                ax2.set_ylabel('residuals ($\sigma$)')
-                ax2.set_ylim(-np.max(np.abs(plt.ylim())), np.max(np.abs(plt.ylim())))
-        
-                ax2.set_ylabel('$\mathrm{O-C\,(\sigma)}$')
-                ax2.set_ylim(-np.max(np.abs(ax2.set_ylim())), np.max(np.abs(ax2.set_ylim())))
-                ax2.axhline(y=0,linestyle=':',color='k')
-                # ad = ax2.yaxis.label.get_position()
-                # print ad[0]
-                # if t.split(';')[0]=='v2':
-                ax1.get_yaxis().set_label_coords(-0.08, 0.5)
-                ax2.get_yaxis().set_label_coords(-0.08, 0.5)
-                ax2.xaxis.set_major_formatter(mtick.FormatStrFormatter('%.0f'))
+                    ax2.set_ylabel('residuals ($\sigma$)')
+                    ax2.set_ylim(-np.max(np.abs(plt.ylim())), np.max(np.abs(plt.ylim())))
+            
+                    ax2.set_ylabel('$\mathrm{O-C\,(\sigma)}$')
+                    ax2.set_ylim(-np.max(np.abs(ax2.set_ylim())), np.max(np.abs(ax2.set_ylim())))
+                    ax2.axhline(y=0,linestyle=':',color='k')
+                    # ad = ax2.yaxis.label.get_position()
+                    # print ad[0]
+                    # if t.split(';')[0]=='v2':
+                    ax1.get_yaxis().set_label_coords(-0.08, 0.5)
+                    ax2.get_yaxis().set_label_coords(-0.08, 0.5)
+                    ax2.xaxis.set_major_formatter(mtick.FormatStrFormatter('%.0f'))
 
         
         
@@ -3466,8 +3674,8 @@ class Open:
                 'unknowm detection limit method: '+method+'. known methods are '+str(knownMethods)
 
         if step is None:
-            step = 1/2. * self.minSpatialScale
-            print(' | step= not given, using 1/2 X smallest spatial scale = %4.2f mas'%step)
+            step = self.minSpatialScale
+            print(' | step= not given, using smallest spatial scale = %4.2f mas'%step)
 
         if rmin is None:
             self.rmin = self.minSpatialScale
@@ -3476,8 +3684,8 @@ class Open:
             self.rmin = rmin
 
         if rmax is None:
-            self.rmax = 1.2*self.smearFov
-            print(" | rmax= not given, set to 1.2*Field of View: rmax=%5.2f mas"%(self.rmax))
+            self.rmax = self.smearFov
+            print(" | rmax= not given, set to Field of View: rmax=%5.2f mas"%(self.rmax))
         else:
             self.rmax = rmax
         self._estimateNsmear()
@@ -3498,7 +3706,7 @@ class Open:
             self._chi2Data = []
             for k, data_1 in enumerate(self._rawData): 
                 for kk, data_2 in enumerate(self._rawData[k]): 
-                    if self._rawData[k][0][:2]=='v2': 
+                    if self._rawData[k][0][:2] in ['v2','|v']: 
                         if kk==0: 
                             self._chi2Data.append([self._rawData[k][0]]) 
                         else: 
@@ -3520,6 +3728,17 @@ class Open:
                             tmp = tmp.replace([np.inf,-np.inf], np.nan)
                             # print(tmp)
                             self._chi2Data[k].append(tmp.to_numpy())
+                    # if self._rawData[k][0][:2]=='|v|': 
+                    #     if kk==0: 
+                    #         self._chi2Data.append([self._rawData[k][0]]) 
+                    #     else: 
+                    #         tmp_ = pd.DataFrame(self._rawData[k][kk]).fillna(np.inf).to_numpy()
+                    #         tmp = np.where((self._rawData[k][3]<self.wlRange[1])*(self._rawData[k][3]>self.wlRange[0]), tmp_, np.nan)
+                    #         tmp = pd.DataFrame(tmp)
+                    #         tmp = tmp.dropna(axis=1)
+                    #         tmp = tmp.replace([np.inf,-np.inf], np.nan)
+                    #         # print(tmp)
+                    #         self._chi2Data[k].append(tmp.to_numpy())
         else:
             self._chi2Data = self._copyRawData()
 
@@ -3641,7 +3860,7 @@ class Open:
                 #plt.pcolormesh(X, Y, self.allf3s[m], cmap=CONFIG['color map'],
                 #    vmin=vmin, vmax=vmax)
                 plt.pcolormesh(X, Y, -2.5*np.log10(self.allf3s[m]/100.), cmap=CONFIG['color map'],
-                    vmin=vmin, vmax=vmax)
+                    vmin=vmin, vmax=vmax, shading='auto')
                 plt.colorbar()
                 # plt.xlabel(r'E $\leftarrow\, \Delta \alpha$ (mas)')
                 # plt.ylabel(r'$\Delta \delta\, \rightarrow$ N (mas)')
@@ -3843,13 +4062,13 @@ class Open:
                 plt.title('log10[$\chi^2$ best fit / $\chi^2_{UD}$]')
             plt.pcolormesh(_X-dx/2,
                            _Y-dy/2,
-                           _Z, cmap=CONFIG['color map']+'_r')
+                           _Z, cmap=CONFIG['color map'])
         else:
             if CONFIG['suptitle']:   ### Alex
                 plt.title('$\chi^2$ best fit / $\chi^2_{UD}$')
             plt.pcolormesh(_X-dx/2,
                            _Y-dy/2,
-                           _Z, cmap=CONFIG['color map']+'_r')
+                           _Z, cmap=CONFIG['color map'])
 
         plt.plot(0,0, '*y', ms=10) ### Alex
 
@@ -4010,7 +4229,8 @@ def _dpfit_leastsqFit(func, x, params, y, err=None, fitOnly=None, verbose=False,
             fitOnly = list(filter(lambda x: x not in doNotFit, params.keys()))
         else:
             fitOnly = params.keys()
-        fitOnly.sort() # makes some display nicer
+        # fitOnly.sort() # makes some display nicer
+        fitOnly = sorted(fitOnly) ### Alex (python3 syntax changes)
 
     # -- build fitted parameters vector:
     pfit = [params[k] for k in fitOnly]

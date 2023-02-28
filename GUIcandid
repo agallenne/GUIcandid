@@ -400,25 +400,34 @@ class Ui_MainWindow(object):
         self.label_Bootstrap.setObjectName("label_Bootstrap")
             
         self.label_NBootstrap = QtWidgets.QLabel(self.centralwidget)
-        self.label_NBootstrap.setGeometry(QtCore.QRect(402, 182, 14, 16))
+        self.label_NBootstrap.setGeometry(QtCore.QRect(400, 183, 14, 16))
         self.label_NBootstrap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
         self.label_NBootstrap.setObjectName("label_NBootstrap")
         self.lineEdit_Nbootstrap = QtWidgets.QLineEdit(self.centralwidget)
-        self.lineEdit_Nbootstrap.setGeometry(QtCore.QRect(418, 180, 45, 23))
+        self.lineEdit_Nbootstrap.setGeometry(QtCore.QRect(415, 180, 42, 23))
         self.lineEdit_Nbootstrap.setObjectName("lineEdit_Nbootstrap")
         self.lineEdit_Nbootstrap.setToolTip('Number of bootstrap sample')
         self.lineEdit_Nbootstrap.setText('1000')
 
         self.checkBox_MCBootstrap = QtWidgets.QCheckBox(self.centralwidget)
-        self.checkBox_MCBootstrap.setGeometry(QtCore.QRect(472, 181, 46, 20))
+        self.checkBox_MCBootstrap.setGeometry(QtCore.QRect(460, 181, 40, 20))
         self.checkBox_MCBootstrap.setObjectName("checkBox_MCBootstrap")
-        
+        self.checkBox_MCBootstrap.setToolTip('Check to perform a simple Monte Carlo bootstrapping')
+
+
+        self.checkBox_BaselineBootstrap = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox_BaselineBootstrap.setGeometry(QtCore.QRect(501, 181, 40, 20))
+        self.checkBox_BaselineBootstrap.setObjectName("checkBox_BaselineBootstrap")
+        self.checkBox_BaselineBootstrap.setChecked(True)
+        self.checkBox_BaselineBootstrap.setToolTip('Check to bootstrap on the baselines too')
+
+
         self.label_FigBootstrap = QtWidgets.QLabel(self.centralwidget)
-        self.label_FigBootstrap.setGeometry(QtCore.QRect(524, 182, 23, 16))
+        self.label_FigBootstrap.setGeometry(QtCore.QRect(535, 182, 23, 16))
         self.label_FigBootstrap.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
         self.label_FigBootstrap.setObjectName("label_FigBootstrap")
         self.comboBox_FigBootstrap = QtWidgets.QComboBox(self.centralwidget)
-        self.comboBox_FigBootstrap.setGeometry(QtCore.QRect(547, 178, 75, 26))
+        self.comboBox_FigBootstrap.setGeometry(QtCore.QRect(557, 178, 68, 26))
         self.comboBox_FigBootstrap.setObjectName("comboBox_FigBootstrap")
         self.comboBox_FigBootstrap.addItems(['Fig 1', 'Fig 2', 'Fig 3', 'Fig 4', 'Fig 5'])
         self.comboBox_FigBootstrap.setToolTip('To plot in different figures and keep the previous ones (set to 5 max)')
@@ -610,7 +619,7 @@ class Ui_MainWindow(object):
         self.label_ColorMap.setText(_translate("MainWindow", "Color map:"))
         self.label_Ncores.setText(_translate("MainWindow", "N Cores:"))
         self.checkBox_Title.setText(_translate("MainWindow", "Titles"))
-        self.label_ExecTime.setText(_translate("MainWindow", "Exec. Time(s):"))
+        self.label_ExecTime.setText(_translate("MainWindow", "Exeself.candid. Time(s):"))
         self.label_Region.setText(_translate("MainWindow", "Region:"))
         self.label_Instrument.setText(_translate("MainWindow", "Instrument:"))
         self.label_WLRange.setText(_translate("MainWindow", "WL range:"))
@@ -658,6 +667,8 @@ class Ui_MainWindow(object):
         urlLink = "<a href=\"https://ui.adsabs.harvard.edu/abs/2015A%26A...579A..68G/abstract\"> Gallenne et al. (2015)</a>"
         self.label_PaperLink.setText(_translate("MainWindow", urlLink))
         self.checkBox_MCBootstrap.setText(_translate("MainWindow", "MC"))
+        self.checkBox_BaselineBootstrap.setText(_translate("MainWindow", "B"))
+
 
     def changeWLRange(self):
         wlrange = self.lineEdit_WLRange.text()
@@ -729,9 +740,16 @@ class Ui_MainWindow(object):
         else:
             comp = None
 
-        self.candid.detectionLimit(float(self.lineEdit_StepDetectionMap.text()), fig=fig, methods=method,
+        self.candid.detectionLimit(float(self.lineEdit_StepDetectionMap.text()), rmin=rmin, rmax=rmax, fig=fig, methods=method,
                                    drawMaps=self.checkBox_DrawMaps.isChecked(), n_Sigma=int(self.lineEdit_NSigmaDetectionMap.text()),
                                    removeCompanion=comp, fullMap=self.checkBox_FullMap.isChecked())
+
+        print(' | ')
+        print(' | Average detection limits:')
+        ravg = rmax/2.
+        print(' | r < %3.0fmas: dm = %.2fmag, std = %.2fmag'%(ravg, -2.5*np.log10(np.mean(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']<ravg])/100.), 2.5/np.log(10)*np.std(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']<ravg])/np.mean(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']<ravg]) ))
+        print(' | r > %3.0fmas: dm = %.2fmag, std = %.2fmag'%(ravg, -2.5*np.log10(np.mean(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']>ravg])/100.), 2.5/np.log(10)*np.std(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']>ravg])/np.mean(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']>ravg]) ))
+        print(' | r < %3.0fmas: dm = %.2fmag, std = %.2fmag\n'%(rmax, -2.5*np.log10(np.mean(self.candid.f3s['Gallenne'])/100.), 2.5/np.log(10)*np.std(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']<ravg*2])/np.mean(self.candid.f3s['Gallenne']) ))
 
     def doBootstrap(self):
 
@@ -789,7 +807,8 @@ class Ui_MainWindow(object):
         #     MC = False
 
         fig = int(self.comboBox_FigBootstrap.currentText()[-1])
-        self.candid.fitBoot(int(self.lineEdit_Nbootstrap.text()), fig=fig, doNotFit=self.doNotFit, monteCarlo=self.checkBox_MCBootstrap.isChecked())
+        self.candid.fitBoot(int(self.lineEdit_Nbootstrap.text()), fig=fig, doNotFit=self.doNotFit, monteCarlo=self.checkBox_MCBootstrap.isChecked(),
+                                useBaselines=self.checkBox_BaselineBootstrap.isChecked())
         
     def doFitMap(self):
         
@@ -1076,8 +1095,11 @@ def show_exception_box(log_msg):
         log.debug("No QApplication instance available.")
  
 class UncaughtHook(QtCore.QObject):
-    _exception_caught = QtCore.Signal(object)
- 
+    if platform.system() == 'Darwin':
+        _exception_caught = QtCore.Signal(object)
+    else:
+        _exception_caught = QtCore.pyqtSignal(object)
+
     def __init__(self, *args, **kwargs):
         super(UncaughtHook, self).__init__(*args, **kwargs)
 

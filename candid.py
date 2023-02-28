@@ -1597,7 +1597,7 @@ class Open:
                 maxRes = max(maxRes, Bmax/self.wavel[ins].min())
                 # print('V2',Bmax, self.wavel[ins].min(), self.dwavel[ins])
                 if 'GRAVITY' in ins: ###Alex
-                    if ins=='GRAVITY_FT':
+                    if 'GRAVITY_FT' in ins:
                         self.smearFovFT = np.min([self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi])
                     else:
                         self.smearFovSC = np.min([self.smearFov, self.wavel[ins].min()**2/self.dwavel[ins]/Bmax*180*3.6/np.pi])
@@ -1631,6 +1631,7 @@ class Open:
         print(' | Diffraction Field of view: %7.2f mas'%(self.diffFov))
         if 'GRAVITY' in ins:
             print(' | WL Smearing Field of view: FT: %7.0f mas, SC: %7.0f mas'%(self.smearFovFT, self.smearFovSC))
+            self.smearFov = np.min([self.smearFovFT, self.smearFovSC])
         else:
             print(' | WL Smearing Field of view: %7.2f mas'%(self.smearFov))            
         if 'SAM' not in ins:
@@ -1809,8 +1810,11 @@ class Open:
             self.rmin = rmin
 
         if rmax is None:
-            self.rmax = 1.2*self.smearFov
-            print(" | rmax= not given, set to 1.2*Field of View: rmax=%5.2f mas"%(self.rmax))
+            if 'GRAVITY' in ins: ### Alex
+                self.rmax = 1.2*self.smearFovFT
+            else:
+                self.rmax = 1.2*self.smearFov
+            print(" | rmax= not given, set to 1.2*Field of View (smallest if several instruments): rmax=%5.2f mas"%(self.rmax))
         else:
             self.rmax = rmax
         self._estimateNsmear()
@@ -2057,7 +2061,10 @@ class Open:
         result['call']['rmin']=self.rmin
 
         if rmax is None:
-            self.rmax = 1.2*self.smearFov
+            if 'GRAVITY' in ins: ### Alex
+                self.rmax = 1.2*self.smearFovFT
+            else:
+                self.rmax = 1.2*self.smearFov
             if not self.orbel.keys(): ### Alex
                 print(" | rmax= not given, set to Field of View (bandwidth smearing): rmax=%5.2f mas"%(self.rmax))
         else:
@@ -3684,7 +3691,10 @@ class Open:
             self.rmin = rmin
 
         if rmax is None:
-            self.rmax = self.smearFov
+            if any('GRAVITY' in inst for inst in self.instruments): ### Alex
+                self.rmax = 1.2*self.smearFovFT
+            else:
+                self.rmax = 1.2*self.smearFov
             print(" | rmax= not given, set to Field of View: rmax=%5.2f mas"%(self.rmax))
         else:
             self.rmax = rmax
@@ -3888,12 +3898,12 @@ class Open:
 
         self.detectionLimitResult = {'r': r}
         for m in methods:
-            self.detectionLimitResult[m+'_99_M'] = -2.5*np.log10(sliding_percentile(r, r_f3s[m],
-                                            self.rmax/float(N), 99)/100.)
+            self.detectionLimitResult[m+'_90_M'] = -2.5*np.log10(sliding_percentile(r, r_f3s[m],
+                                            self.rmax/float(N), 90)/100.)
 
         if not fig is None:
             for m in methods:            
-                plt.plot(r, self.detectionLimitResult[m+'_99_M'],
+                plt.plot(r, self.detectionLimitResult[m+'_90_M'],
                         linewidth=3, alpha=0.5, label=m+' (90%)')   ### Alex
 
             plt.ylabel('$\Delta \mathrm{Mag}_{%i\sigma}$'%n_Sigma) ### Alex

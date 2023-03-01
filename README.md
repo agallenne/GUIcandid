@@ -24,4 +24,4 @@ The GUI will open. Tool tips are available with some explanations of each functi
 
 Note: Only tested on MacOS 13.12 with Python 3.8.13 and Ubuntu 22.04.1 with Python 3.9.13
 
-![GUI](figure.png)
+![GUI](https://user-images.githubusercontent.com/12450258/222246116-fa1d7582-15df-4b0b-9308-fb272027de68.png)

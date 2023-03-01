@@ -743,13 +743,16 @@ class Ui_MainWindow(object):
         self.candid.detectionLimit(float(self.lineEdit_StepDetectionMap.text()), rmin=rmin, rmax=rmax, fig=fig, methods=method,
                                    drawMaps=self.checkBox_DrawMaps.isChecked(), n_Sigma=int(self.lineEdit_NSigmaDetectionMap.text()),
                                    removeCompanion=comp, fullMap=self.checkBox_FullMap.isChecked())
-
-        print(' | ')
-        print(' | Average detection limits:')
-        ravg = rmax/2.
-        print(' | r < %3.0fmas: dm = %.2fmag, std = %.2fmag'%(ravg, -2.5*np.log10(np.mean(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']<ravg])/100.), 2.5/np.log(10)*np.std(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']<ravg])/np.mean(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']<ravg]) ))
-        print(' | r > %3.0fmas: dm = %.2fmag, std = %.2fmag'%(ravg, -2.5*np.log10(np.mean(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']>ravg])/100.), 2.5/np.log(10)*np.std(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']>ravg])/np.mean(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']>ravg]) ))
-        print(' | r < %3.0fmas: dm = %.2fmag, std = %.2fmag\n'%(rmax, -2.5*np.log10(np.mean(self.candid.f3s['Gallenne'])/100.), 2.5/np.log(10)*np.std(self.candid.f3s['Gallenne'][self.candid.f3s['r(mas)']<ravg*2])/np.mean(self.candid.f3s['Gallenne']) ))
+        try:
+            flimit = self.candid.f3s['Gallenne']
+            print(' | ')
+            print(' | Average detection limits:')
+            ravg = rmax/2.
+            print(' | r < %3.0fmas: dm = %.2fmag, std = %.2fmag'%(ravg, -2.5*np.log10(np.mean(flimit[self.candid.f3s['r(mas)']<ravg])/100.), 2.5/np.log(10)*np.std(flimit[self.candid.f3s['r(mas)']<ravg])/np.mean(flimit[self.candid.f3s['r(mas)']<ravg]) ))
+            print(' | r > %3.0fmas: dm = %.2fmag, std = %.2fmag'%(ravg, -2.5*np.log10(np.mean(flimit[self.candid.f3s['r(mas)']>ravg])/100.), 2.5/np.log(10)*np.std(flimit[self.candid.f3s['r(mas)']>ravg])/np.mean(flimit[self.candid.f3s['r(mas)']>ravg]) ))
+            print(' | r < %3.0fmas: dm = %.2fmag, std = %.2fmag\n'%(rmax, -2.5*np.log10(np.mean(flimit)/100.), 2.5/np.log(10)*np.std(flimit[self.candid.f3s['r(mas)']<ravg*2])/np.mean(flimit) ))
+        except:
+            pass
 
     def doBootstrap(self):
 

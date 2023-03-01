@@ -17,7 +17,7 @@ CANDID code/install/examples can be find in the original repository [here](https
 To run the GUI, go to the directory then type:
 
 ```
-GUIcandid 
+./GUIcandid 
 ```
 
 The GUI will open. Tool tips are available with some explanations of each function.

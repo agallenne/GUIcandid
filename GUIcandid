@@ -1076,7 +1076,7 @@ class Ui_MainWindow(object):
             Nfiles = files[0]
                     
         self.pushButton_LoadOI.setToolTip('Select oifit file(s) to load\n\nLoaded file(s): '+Nfiles)
-
+        self.selectObservables()
 
 import sys
 import traceback
